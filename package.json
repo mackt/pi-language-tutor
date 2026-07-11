@@ -1,0 +1,27 @@
+{
+	"name": "pi-language-tutor",
+	"version": "0.1.0",
+	"description": "Pi extension for practicing a foreign language while coding: background grammar checks on your prompts and shortcut translation of assistant responses",
+	"type": "module",
+	"main": "language-learn.ts",
+	"scripts": {
+		"check": "tsc --noEmit",
+		"test": "node --experimental-strip-types test.mjs"
+	},
+	"keywords": [
+		"pi",
+		"pi-extension",
+		"language-learning"
+	],
+	"devDependencies": {
+		"@earendil-works/pi-ai": "^0.80.6",
+		"@earendil-works/pi-coding-agent": "^0.80.6",
+		"@earendil-works/pi-tui": "^0.80.6",
+		"@types/node": "^26.1.1",
+		"typescript": "^5.7.0"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/mackt/pi-language-tutor.git"
+	}
+}
