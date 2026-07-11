@@ -1,5 +1,7 @@
 # pi-language-tutor
 
+English | [简体中文](README.zh-CN.md)
+
 A [pi](https://pi.dev) extension for practicing a foreign language while you code.
 
 - **Writing feedback** — prompts you type in your learning language are reviewed in the background (never blocking the agent) for spelling, grammar, and natural phrasing. Corrections appear in a widget above the editor, with short explanations in your native language and, when your phrasing sounds non-native, one more natural way to say it. The widget disappears when your message is clean.
