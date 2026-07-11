@@ -2,48 +2,90 @@
 
 [English](README.md) | 简体中文
 
-一个 [pi](https://pi.dev) 扩展，让你在写代码的同时顺带练外语。
-
-- **写作反馈** — 你用学习语言（比如英语）输入的 prompt 会在后台接受检查（完全不阻塞 agent），覆盖拼写、语法和地道表达三个层面。纠错结果显示在编辑器上方的小面板里，附有母语写的简短解释；当你的句子虽然正确但不够地道时，还会给出一句更自然的说法。消息没有问题时面板自动消失。
-- **双语对照翻译** — 按 `alt+t`（或运行 `/translate`）把 agent 的最新回复渲染成沉浸式翻译风格的双语卡片：每个原文段落下面紧跟它的译文（引用块样式）。短代码块（≤5 行）保留在卡片里，长代码块显示为 `[code block ↑ N lines]` 占位符——原文就在正上方，无需重复。卡片不会进入 LLM 上下文，不额外消耗 token。
-- **自动模式** — `/lang auto on` 后每轮对话的最终回复都会自动翻译（跳过中间的工具调用过程叙述，以及少于 15 个词的短回复）。开启时底部状态栏显示 `🌐 auto`，翻译进行中显示 `translating…`。
-- **默认省钱** — 两个功能默认使用当前会话的模型；用 `/lang model` 可以指定一个更便宜的模型专门跑检查和翻译。
+一边写代码一边学外语。这个 [pi](https://pi.dev) 扩展会检查你 prompt 里的拼写、语法和地道表达——用你的母语解释错在哪——并把 agent 的回复渲染成沉浸式翻译风格的双语对照。
 
 ## 安装
 
-把扩展软链接到 pi 的全局扩展目录（自动发现，改动后 `/reload` 即可热重载）：
+克隆仓库，把扩展软链接到 pi 的全局扩展目录（自动发现，改动后 `/reload` 热重载）：
 
 ```sh
-ln -s "$(pwd)/language-learn.ts" ~/.pi/agent/extensions/language-learn.ts
+git clone https://github.com/mackt/pi-language-tutor.git
+ln -s "$(pwd)/pi-language-tutor/language-learn.ts" ~/.pi/agent/extensions/language-learn.ts
 ```
 
-或者写进 `~/.pi/agent/settings.json`：
+这是唯一必需的步骤。无需构建——pi 直接加载 TypeScript——默认配置（学英语、母语简体中文）开箱即用。母语不是中文？一条命令：`/lang native ja`。
+
+<details>
+<summary>备选：通过 settings.json 加载</summary>
+
+在 `~/.pi/agent/settings.json` 里写入绝对路径：
 
 ```json
-{ "extensions": ["/path/to/pi-learn-foreign-language/language-learn.ts"] }
+{ "extensions": ["/path/to/pi-language-tutor/language-learn.ts"] }
 ```
 
-无需构建 — pi 直接加载 TypeScript。
+</details>
+
+## 先试试这个
+
+1. 启动 `pi`，用你正在学的语言发一句 prompt，带着错误也没关系：
+
+   ```text
+   when agent anwser me, I want translate it, it have three feature
+   ```
+
+   agent 回答的同时，编辑器上方会出现 `✏ Writing check` 面板：每个错误的改法和中文解释，外加一句整体更地道的说法。
+
+2. agent 回答完，按 `alt+t`（macOS 是 ⌥T——需要在终端里[把 Option 设为 Meta 键](https://iterm2.com/documentation-preferences-profiles-keys.html)，或者直接运行 `/translate`）。回复会重新渲染成双语卡片：每个原文段落下面紧跟译文。
+
+3. 喜欢双语视图？让它自动化：
+
+   ```text
+   /lang auto on
+   ```
+
+   到这里就够用了。
+
+## 它是怎么工作的
+
+- **绝不阻塞。** 你的消息立即发给 agent；写作检查并行运行，面板稍后出现。消息没问题时什么也不显示。
+- **绝不污染对话。** 翻译卡片只存在于你的终端——永远不会发回给 LLM，不占上下文。
+- **花费你说了算。** 两个功能默认用会话模型；`/lang model` 指到一个便宜模型上，一行配置就能让每次检查几乎免费。
+
+## 命令
+
+| 命令 | 作用 |
+|------|------|
+| `alt+t` 或 `/translate` | 翻译最新的 agent 回复（双语卡片） |
+| `/lang` | 查看当前配置 |
+| `/lang on` \| `off` | 恢复/暂停写作检查 |
+| `/lang auto on` \| `off` | 自动翻译每轮最终回复 |
+| `/lang native <code>` | 设置母语——译文目标语言和解释用语（`zh-CN`、`ja`…） |
+| `/lang learning <code>` | 设置正在学习的语言（`en`、`fr`…） |
+| `/lang model <provider/id>` | 用更便宜的模型跑检查和翻译 |
+| `/lang model default` | 换回会话模型 |
 
 ## 配置
 
-配置保存在 `~/.pi/agent/language-learn.json`，通过 `/lang` 命令管理：
+配置持久化在 `~/.pi/agent/language-learn.json`；`/lang` 命令能管理所有选项，基本不需要手动编辑。
 
+```json
+{
+	"learning": "en",
+	"native": "zh-CN",
+	"model": "openai/gpt-4o-mini",
+	"enabled": true,
+	"auto": false
+}
 ```
-/lang                      查看当前配置
-/lang on | off             暂停/恢复写作检查
-/lang auto on | off        自动翻译每轮回复（双语卡片）
-/lang native ja            设置你的母语（译文目标语言 + 解释用语）
-/lang learning fr          设置你正在学习的语言
-/lang model openai/gpt-4o-mini   用更便宜的模型跑检查/翻译
-/lang model default        使用会话模型
-```
 
-默认值：`learning=en`、`native=zh-CN`、会话模型、`auto=off`。
+`model` 是可选的——不设置时使用会话模型。
 
-## 哪些消息会被检查
+## 细节
 
-为了避免浪费 token 和产生噪音，写作检查会跳过：斜杠/感叹号命令、少于 4 个词的消息、以代码或路径为主的消息、不是用学习语言写的消息，以及 `/lang off` 期间的一切输入。检查只在交互式 TUI 模式下运行，检查失败绝不会干扰你的会话。
+**哪些消息会被检查。** 为了避免浪费 token 和产生噪音，写作检查会跳过：斜杠/感叹号命令、少于 4 个词的消息、以代码或路径为主的消息、不是用学习语言写的消息，以及 `/lang off` 期间的一切输入。检查只在交互式 TUI 模式下运行，检查失败绝不会干扰你的会话。
+
+**双语卡片。** 段落按"原文在上、译文在下"对齐，沉浸式翻译风格。短代码块（≤5 行）保留在卡片里，长代码块显示为 `[code block ↑ N lines]` 占位符——原文就在正上方。自动模式会跳过中间的工具调用叙述和少于 15 个词的回复；开启时底部状态栏显示 `🌐 auto`。
 
 ## 开发
 

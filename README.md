@@ -2,48 +2,90 @@
 
 English | [简体中文](README.zh-CN.md)
 
-A [pi](https://pi.dev) extension for practicing a foreign language while you code.
-
-- **Writing feedback** — prompts you type in your learning language are reviewed in the background (never blocking the agent) for spelling, grammar, and natural phrasing. Corrections appear in a widget above the editor, with short explanations in your native language and, when your phrasing sounds non-native, one more natural way to say it. The widget disappears when your message is clean.
-- **Bilingual translate** — press `alt+t` (or run `/translate`) to render the last assistant response as an immersive-translate-style bilingual card: each original paragraph followed by its translation as a blockquote. Short code blocks (≤5 lines) are kept in the card; longer ones become a `[code block ↑ N lines]` placeholder since the original sits right above. Cards are never sent to the LLM.
-- **Auto mode** — `/lang auto on` translates the final response of every turn automatically (intermediate tool-call narration is skipped, as are responses under ~15 words). The footer shows `🌐 auto` while enabled and `translating…` while a translation is running.
-- **Cheap by default** — both features use the session model unless you point them at a cheaper one with `/lang model`.
+Learn a foreign language while you code. A [pi](https://pi.dev) extension that reviews your prompts for spelling, grammar, and natural phrasing — with explanations in your native language — and renders agent replies as bilingual immersive translations.
 
 ## Install
 
-Symlink the extension into pi's global extensions directory (auto-discovered, hot-reloads with `/reload`):
+Clone this repo and symlink the extension into pi's global extensions directory (auto-discovered, hot-reloads with `/reload`):
 
 ```sh
-ln -s "$(pwd)/language-learn.ts" ~/.pi/agent/extensions/language-learn.ts
+git clone https://github.com/mackt/pi-language-tutor.git
+ln -s "$(pwd)/pi-language-tutor/language-learn.ts" ~/.pi/agent/extensions/language-learn.ts
 ```
 
-Or add it to `~/.pi/agent/settings.json`:
+That is the only required step. There is no build — pi loads TypeScript directly — and the defaults (learning English, native Simplified Chinese) work out of the box. Speak another language? One command: `/lang native ja`.
+
+<details>
+<summary>Alternative: load via settings.json</summary>
+
+Add the absolute path to `~/.pi/agent/settings.json`:
 
 ```json
-{ "extensions": ["/path/to/pi-learn-foreign-language/language-learn.ts"] }
+{ "extensions": ["/path/to/pi-language-tutor/language-learn.ts"] }
 ```
 
-No build step — pi loads TypeScript directly.
+</details>
 
-## Configure
+## Try this first
 
-Settings live in `~/.pi/agent/language-learn.json` and are managed with the `/lang` command:
+1. Start `pi` and send a prompt in your learning language, mistakes and all:
 
+   ```text
+   when agent anwser me, I want translate it, it have three feature
+   ```
+
+   While the agent answers, a `✏ Writing check` panel appears above the editor: each mistake with its fix and a short explanation in your native language, plus one more natural way to phrase the whole sentence.
+
+2. When the agent finishes, press `alt+t` (macOS: ⌥T — [enable Option-as-Meta](https://iterm2.com/documentation-preferences-profiles-keys.html) in your terminal, or run `/translate`). The response re-renders as a bilingual card: each paragraph followed by its translation.
+
+3. Like the bilingual view? Make it automatic:
+
+   ```text
+   /lang auto on
+   ```
+
+That is enough to start.
+
+## What happens
+
+- **Nothing ever blocks.** Your message goes to the agent immediately; the writing check runs in parallel and the panel appears a moment later. A clean message shows no panel at all.
+- **Nothing pollutes the conversation.** Translation cards live only in your terminal — they are never sent back to the LLM and cost no context.
+- **You control the spend.** Both features use your session model by default; point them at a cheaper one with `/lang model` and a one-line config change makes every check nearly free.
+
+## Commands
+
+| Command | What it does |
+|---------|--------------|
+| `alt+t` or `/translate` | Translate the last assistant response (bilingual card) |
+| `/lang` | Show current settings |
+| `/lang on` \| `off` | Resume / pause the writing check |
+| `/lang auto on` \| `off` | Auto-translate every final response |
+| `/lang native <code>` | Set your native language — translation target and explanation language (`zh-CN`, `ja`, …) |
+| `/lang learning <code>` | Set the language you are practicing (`en`, `fr`, …) |
+| `/lang model <provider/id>` | Use a cheaper model for checks and translations |
+| `/lang model default` | Go back to the session model |
+
+## Configuration
+
+Settings persist in `~/.pi/agent/language-learn.json`; the `/lang` command manages everything, so you rarely edit it by hand.
+
+```json
+{
+	"learning": "en",
+	"native": "zh-CN",
+	"model": "openai/gpt-4o-mini",
+	"enabled": true,
+	"auto": false
+}
 ```
-/lang                      show current settings
-/lang on | off             pause/resume the writing check
-/lang auto on | off        auto-translate every response (bilingual card)
-/lang native ja            set your native language (translation target + explanation language)
-/lang learning fr          set the language you are practicing
-/lang model openai/gpt-4o-mini   use a cheaper model for checks/translations
-/lang model default        use the session model
-```
 
-Defaults: `learning=en`, `native=zh-CN`, session model, `auto=off`.
+`model` is optional — when unset, the session model is used.
 
-## What gets checked
+## Details
 
-To avoid wasted tokens and noise, the writing check skips: slash/bang commands, messages under 4 words, messages that are mostly code or paths, messages not written in the learning language, and everything while `/lang off`. Checks run only in interactive TUI mode, and a failed check never disturbs your session.
+**What gets checked.** To avoid wasted tokens and noise, the writing check skips: slash/bang commands, messages under 4 words, messages that are mostly code or paths, messages not written in the learning language, and everything while `/lang off`. Checks run only in interactive TUI mode, and a failed check never disturbs your session.
+
+**Bilingual cards.** Paragraphs are aligned original-then-translation, immersive-translate style. Short code blocks (≤5 lines) are kept in the card; longer ones become a `[code block ↑ N lines]` placeholder since the original sits right above. Auto mode skips intermediate tool-call narration and responses under ~15 words; the footer shows `🌐 auto` while enabled.
 
 ## Development
 
