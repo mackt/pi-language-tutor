@@ -1,7 +1,7 @@
 {
 	"name": "pi-language-tutor",
 	"version": "0.1.0",
-	"description": "Pi extension for practicing a foreign language while coding: background grammar checks on your prompts and shortcut translation of assistant responses",
+	"description": "Pi extension for learning a foreign language while coding: background writing feedback (spelling, grammar, natural phrasing) on your prompts and bilingual translation of assistant responses",
 	"type": "module",
 	"main": "language-learn.ts",
 	"scripts": {

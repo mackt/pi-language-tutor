@@ -2,7 +2,8 @@
  * Language-learning extension for pi.
  *
  * Practice a foreign language while you code:
- * - Prompts you type in the learning language are grammar/spell-checked in the
+ * - Prompts you type in the learning language get writing feedback (spelling,
+ *   grammar, natural phrasing) in the
  *   background (non-blocking) and corrections appear in a widget above the
  *   editor, with short explanations in your native language.
  * - alt+t (or /translate) renders the last assistant response as a bilingual
@@ -214,7 +215,7 @@ export function parseGrammarResult(raw: string): GrammarResult | undefined {
 function showGrammarWidget(ctx: ExtensionContext, items: GrammarItem[], rephrase: string | undefined): void {
 	ctx.ui.setWidget(WIDGET_KEY, (_tui, theme) => {
 		const container = new Container();
-		container.addChild(new Text(theme.fg("accent", theme.bold("✏ Grammar")), 1, 0));
+		container.addChild(new Text(theme.fg("accent", theme.bold("✏ Writing check")), 1, 0));
 		for (const item of items) {
 			const line = `${theme.fg("error", `"${item.wrong}"`)} → ${theme.fg("success", `"${item.right}"`)}  ${theme.fg("dim", item.reason)}`;
 			container.addChild(new Text(line, 1, 0));
