@@ -42,12 +42,11 @@ ln -s "$(pwd)/pi-language-tutor" ~/.pi/agent/extensions/pi-language-tutor
    when agent anwser me, I want translate it, it have three feature
    ```
 
-   While the agent answers, a `✏ Writing check` panel appears above the editor: each mistake with its fix and a short explanation in your native language, plus one more natural way to phrase the whole sentence.
+   While the agent answers, a `✏ Writing check` panel appears above the editor: each mistake with its fix and a short explanation in your native language, plus a more natural phrasing of the whole sentence.
 
 2. When the agent finishes, press `alt+t` (macOS: ⌥T — [enable Option-as-Meta](https://iterm2.com/documentation-preferences-profiles-keys.html) in your terminal, or run `/translate`). The response re-renders as a bilingual card: each paragraph followed by its translation.
 
    <img src="docs/bilingual-card.png" width="720" alt="The bilingual card: each paragraph of the agent's response is followed by its translation, immersive-translate style, with code blocks kept intact.">
-
 
 3. Like the bilingual view? Make it automatic:
 
@@ -61,7 +60,7 @@ That is enough to start.
 
 - **Nothing ever blocks.** Your message goes to the agent immediately; the writing check runs in parallel and the panel appears a moment later. A clean message shows no panel at all.
 - **Nothing pollutes the conversation.** Translation cards live only in your terminal — they are never sent back to the LLM and cost no context.
-- **You control the spend.** Both features use your session model by default; point them at a cheaper one with `/lang model` and a one-line config change makes every check nearly free.
+- **You control the spend.** Both features use your session model by default; point them at a cheaper one with `/lang model` and every check becomes nearly free.
 
 ## Commands
 
@@ -106,4 +105,4 @@ npm run check   # typecheck
 npm test        # unit tests for the skip heuristics and response parsing
 ```
 
-Layout: `src/core.ts` holds the pure logic (heuristics, prompts, parsing, card assembly — what the tests import), `src/config.ts` the config persistence, and `src/index.ts` the pi adapter (the only file that imports pi packages). `language-learn.ts` is the entry point re-exporting both.
+Layout: `src/core.ts` holds the pure logic (heuristics, prompts, parsing, card assembly — what the tests import), `src/config.ts` the config persistence, and `src/index.ts` the pi adapter (the only file that imports pi packages). `language-learn.ts` is the entry point re-exporting them.
