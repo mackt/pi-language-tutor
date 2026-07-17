@@ -4,6 +4,10 @@ English | [简体中文](README.zh-CN.md)
 
 Learn a foreign language while you code. A [pi](https://pi.dev) extension that reviews your prompts for spelling, grammar, and natural phrasing — with explanations in your native language — and renders agent replies as bilingual immersive translations.
 
+<img src="docs/writing-check.png" width="720" alt="The Writing check panel: while the agent works on the prompt, each mistake is shown with its fix, an explanation in your native language, and a more natural phrasing of the whole sentence.">
+
+*You prompt with mistakes, the agent works anyway — and the `✏ Writing check` panel explains each fix in your native language.*
+
 ## Install
 
 ```sh
@@ -41,6 +45,9 @@ ln -s "$(pwd)/pi-language-tutor" ~/.pi/agent/extensions/pi-language-tutor
    While the agent answers, a `✏ Writing check` panel appears above the editor: each mistake with its fix and a short explanation in your native language, plus one more natural way to phrase the whole sentence.
 
 2. When the agent finishes, press `alt+t` (macOS: ⌥T — [enable Option-as-Meta](https://iterm2.com/documentation-preferences-profiles-keys.html) in your terminal, or run `/translate`). The response re-renders as a bilingual card: each paragraph followed by its translation.
+
+   <img src="docs/bilingual-card.png" width="720" alt="The bilingual card: each paragraph of the agent's response is followed by its translation, immersive-translate style, with code blocks kept intact.">
+
 
 3. Like the bilingual view? Make it automatic:
 
