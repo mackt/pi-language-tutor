@@ -6,22 +6,26 @@
 
 ## 安装
 
-克隆仓库，把扩展软链接到 pi 的全局扩展目录（自动发现，改动后 `/reload` 热重载）：
+```sh
+pi install npm:pi-language-tutor
+```
+
+这是唯一必需的步骤。默认配置（学英语、母语简体中文）开箱即用。母语不是中文？一条命令：`/lang native ja`。
+
+<details>
+<summary>备选：从 git 安装，或本地开发</summary>
+
+不经 npm，直接从 GitHub 安装：
+
+```sh
+pi install git:github.com/mackt/pi-language-tutor
+```
+
+或者克隆仓库，软链接到 pi 的全局扩展目录（通过 package.json 的 `pi.extensions` 字段自动发现，改动后 `/reload` 热重载）——适合开发，因为无需构建，pi 直接加载 TypeScript：
 
 ```sh
 git clone https://github.com/mackt/pi-language-tutor.git
-ln -s "$(pwd)/pi-language-tutor/language-learn.ts" ~/.pi/agent/extensions/language-learn.ts
-```
-
-这是唯一必需的步骤。无需构建——pi 直接加载 TypeScript——默认配置（学英语、母语简体中文）开箱即用。母语不是中文？一条命令：`/lang native ja`。
-
-<details>
-<summary>备选：通过 settings.json 加载</summary>
-
-在 `~/.pi/agent/settings.json` 里写入绝对路径：
-
-```json
-{ "extensions": ["/path/to/pi-language-tutor/language-learn.ts"] }
+ln -s "$(pwd)/pi-language-tutor" ~/.pi/agent/extensions/pi-language-tutor
 ```
 
 </details>
@@ -94,3 +98,5 @@ npm install
 npm run check   # 类型检查
 npm test        # 跳过规则和响应解析的单元测试
 ```
+
+目录结构：`src/core.ts` 是纯逻辑（启发式规则、prompt、解析、卡片拼装——测试只导入这个），`src/config.ts` 负责配置持久化，`src/index.ts` 是 pi 适配层（唯一 import pi 包的文件）。`language-learn.ts` 是入口，把两者重新导出。

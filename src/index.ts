@@ -18,6 +18,7 @@ import {
 	MAX_TRANSLATE_CHARS,
 	MIN_AUTO_WORDS,
 	parseGrammarResult,
+	segmentMarkdown,
 	SHORT_CODE_LINES,
 	shouldSkipCheck,
 	translationLabel,
@@ -176,7 +177,7 @@ export default function (pi: ExtensionAPI) {
 		ctx: ExtensionContext,
 		model: ResolvedModel,
 	): Promise<CardSegment[] | undefined> => {
-		const segments = segmentMarkdownOf(source);
+		const segments = segmentMarkdown(source);
 		const prose = segments.filter((s): s is Segment & { kind: "prose" } => s.kind === "prose");
 		if (prose.length === 0) return undefined;
 
@@ -362,5 +363,3 @@ export default function (pi: ExtensionAPI) {
 		updateStatus(ctx, loadConfig());
 	});
 }
-
-import { segmentMarkdown as segmentMarkdownOf } from "./core.ts";

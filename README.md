@@ -6,22 +6,26 @@ Learn a foreign language while you code. A [pi](https://pi.dev) extension that r
 
 ## Install
 
-Clone this repo and symlink the extension into pi's global extensions directory (auto-discovered, hot-reloads with `/reload`):
+```sh
+pi install npm:pi-language-tutor
+```
+
+That is the only required step. The defaults (learning English, native Simplified Chinese) work out of the box. Speak another language? One command: `/lang native ja`.
+
+<details>
+<summary>Alternative: install from git, or hack on a local clone</summary>
+
+Install straight from GitHub without npm:
+
+```sh
+pi install git:github.com/mackt/pi-language-tutor
+```
+
+Or clone and symlink into pi's global extensions directory (auto-discovered via the `pi.extensions` field in package.json, hot-reloads with `/reload`) — best for development, since there is no build step and pi loads TypeScript directly:
 
 ```sh
 git clone https://github.com/mackt/pi-language-tutor.git
-ln -s "$(pwd)/pi-language-tutor/language-learn.ts" ~/.pi/agent/extensions/language-learn.ts
-```
-
-That is the only required step. There is no build — pi loads TypeScript directly — and the defaults (learning English, native Simplified Chinese) work out of the box. Speak another language? One command: `/lang native ja`.
-
-<details>
-<summary>Alternative: load via settings.json</summary>
-
-Add the absolute path to `~/.pi/agent/settings.json`:
-
-```json
-{ "extensions": ["/path/to/pi-language-tutor/language-learn.ts"] }
+ln -s "$(pwd)/pi-language-tutor" ~/.pi/agent/extensions/pi-language-tutor
 ```
 
 </details>
@@ -94,3 +98,5 @@ npm install
 npm run check   # typecheck
 npm test        # unit tests for the skip heuristics and response parsing
 ```
+
+Layout: `src/core.ts` holds the pure logic (heuristics, prompts, parsing, card assembly — what the tests import), `src/config.ts` the config persistence, and `src/index.ts` the pi adapter (the only file that imports pi packages). `language-learn.ts` is the entry point re-exporting both.

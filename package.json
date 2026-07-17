@@ -3,13 +3,18 @@
 	"version": "0.1.0",
 	"description": "Pi extension for learning a foreign language while coding: background writing feedback (spelling, grammar, natural phrasing) on your prompts and bilingual translation of assistant responses",
 	"type": "module",
+	"license": "MIT",
 	"main": "language-learn.ts",
+	"pi": {
+		"extensions": ["./language-learn.ts"]
+	},
 	"scripts": {
 		"check": "tsc --noEmit",
 		"test": "node --experimental-strip-types test.mjs"
 	},
 	"keywords": [
 		"pi",
+		"pi-package",
 		"pi-extension",
 		"language-learning"
 	],
