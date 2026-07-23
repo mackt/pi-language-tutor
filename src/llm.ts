@@ -5,12 +5,25 @@
  */
 
 import { completeSimple } from "@earendil-works/pi-ai/compat";
-import type { Message, SimpleStreamOptions, Tool } from "@earendil-works/pi-ai/compat";
+import type {
+	AssistantMessage,
+	AssistantMessageEventStream,
+	Context,
+	Message,
+	SimpleStreamOptions,
+	Tool,
+} from "@earendil-works/pi-ai/compat";
 import { convertToLlm } from "@earendil-works/pi-coding-agent";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { Config } from "./core.ts";
 
 export type ResolvedModel = NonNullable<ExtensionContext["model"]>;
+
+type StreamSimpleFn = (
+	model: ResolvedModel,
+	context: Context,
+	options?: SimpleStreamOptions,
+) => AssistantMessageEventStream;
 
 /**
  * A fork of the main session's last LLM request. When the prefix (tools,
@@ -22,6 +35,56 @@ export interface ForkContext {
 	messages: Message[];
 	tools?: Tool[];
 	reasoning: SimpleStreamOptions["reasoning"];
+}
+
+/** Narrow registry surface used by {@link getProviderStreamSimple} (testable). */
+export type StreamSimpleRegistry = {
+	getRegisteredProviderConfig(provider: string):
+		| { api?: string; streamSimple?: StreamSimpleFn }
+		| undefined;
+};
+
+/**
+ * Prefer a provider-registered `streamSimple` over the global `completeSimple`
+ * registry. Custom providers (e.g. `cursor-sdk`) register their handler on the
+ * provider config; `completeSimple` only knows built-in api ids and throws
+ * `No API provider registered for api: …` for those models.
+ */
+export function getProviderStreamSimple(
+	modelRegistry: StreamSimpleRegistry,
+	model: Pick<ResolvedModel, "provider" | "api">,
+): StreamSimpleFn | undefined {
+	const config = modelRegistry.getRegisteredProviderConfig(model.provider);
+	if (!config?.streamSimple) return undefined;
+	// Only use the custom handler when it owns this model's api id.
+	if (config.api !== undefined && config.api !== model.api) return undefined;
+	return config.streamSimple;
+}
+
+/**
+ * pi 0.80 registered extension `streamSimple` into the global api registry, so
+ * `completeSimple` worked for custom apis. pi 0.81 moved that handler onto the
+ * provider config (`getRegisteredProviderConfig`) and stopped calling
+ * `registerApiProvider`, which breaks side-calls for apis like `cursor-sdk`.
+ * Prefer the provider handler when the method exists; otherwise fall back.
+ */
+async function completeWithModel(
+	ctx: ExtensionContext,
+	model: ResolvedModel,
+	context: Context,
+	options: SimpleStreamOptions,
+): Promise<AssistantMessage> {
+	const registry = ctx.modelRegistry as ExtensionContext["modelRegistry"] & Partial<StreamSimpleRegistry>;
+	if (typeof registry.getRegisteredProviderConfig === "function") {
+		const providerStream = getProviderStreamSimple(
+			{ getRegisteredProviderConfig: (id) => registry.getRegisteredProviderConfig!(id) },
+			model,
+		);
+		if (providerStream) {
+			return providerStream(model, context, options).result();
+		}
+	}
+	return completeSimple(model, context, options);
 }
 
 /** The model to use for checks and translations: the configured override, else the session model. */
@@ -52,7 +115,8 @@ export async function runLlm(
 		content: [{ type: "text" as const, text: prompt }],
 		timestamp: Date.now(),
 	};
-	const response = await completeSimple(
+	const response = await completeWithModel(
+		ctx,
 		model,
 		fork
 			? { systemPrompt: fork.systemPrompt, messages: [...fork.messages, user], tools: fork.tools }

@@ -92,4 +92,40 @@ const wp = ext.buildWholeTranslatePrompt("some text", cfg);
 expect("whole prompt wraps source", wp.includes("<<<\nsome text\n>>>"), true);
 expect("contextual whole prompt starts with preface", ext.buildWholeTranslatePrompt("x", cfg, true).startsWith(ext.CONTEXT_PREFACE), true);
 
+// --- getProviderStreamSimple: custom providers (e.g. cursor-sdk) ---
+const { getProviderStreamSimple } = ext;
+const fakeStream = () => ({ result: async () => ({}) });
+expect(
+	"uses registered streamSimple when api matches",
+	typeof getProviderStreamSimple(
+		{ getRegisteredProviderConfig: () => ({ api: "cursor-sdk", streamSimple: fakeStream }) },
+		{ provider: "cursor", api: "cursor-sdk" },
+	),
+	"function",
+);
+expect(
+	"ignores streamSimple when api mismatches",
+	getProviderStreamSimple(
+		{ getRegisteredProviderConfig: () => ({ api: "cursor-sdk", streamSimple: fakeStream }) },
+		{ provider: "cursor", api: "openai-completions" },
+	),
+	undefined,
+);
+expect(
+	"falls back when provider has no streamSimple",
+	getProviderStreamSimple(
+		{ getRegisteredProviderConfig: () => ({ api: "openai-completions" }) },
+		{ provider: "zai", api: "openai-completions" },
+	),
+	undefined,
+);
+expect(
+	"falls back when provider config is undefined",
+	getProviderStreamSimple(
+		{ getRegisteredProviderConfig: () => undefined },
+		{ provider: "cursor", api: "cursor-sdk" },
+	),
+	undefined,
+);
+
 process.exit(failures ? 1 : 0);
