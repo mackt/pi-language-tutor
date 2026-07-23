@@ -16,7 +16,7 @@ import {
   Text
 } from '@earendil-works/pi-tui'
 import { loadConfig, saveConfig } from './config.ts'
-import { resolveModelReference } from './core.ts'
+import { resolveModelReference, resolveStoredModelReference } from './core.ts'
 import type { Config } from './core.ts'
 
 export const STATUS_KEY = 'language-learn'
@@ -36,10 +36,17 @@ export function warnOnCacheMismatch(ctx: ExtensionContext, cfg: Config): void {
   const sessionModel = `${ctx.model.provider}/${ctx.model.id}`
   // A hand-edited config may hold a bare id or a differently-cased ref that
   // still resolves to the session model; compare resolved identities, not
-  // the raw string.
-  const all = ctx.modelRegistry.getAll()
-  const match = resolveModelReference(cfg.model, all, all)
-  const override = match.kind === 'found' ? `${match.model.provider}/${match.model.id}` : cfg.model
+  // the raw string — using the exact same resolution runLlm's resolveModel
+  // uses, so the warning never contradicts what actually happens.
+  const match = resolveStoredModelReference(
+    cfg.model,
+    ctx.modelRegistry.getAvailable(),
+    ctx.modelRegistry.getAll()
+  )
+  const override =
+    match.kind === 'found' || match.kind === 'needsAuth'
+      ? `${match.model.provider}/${match.model.id}`
+      : cfg.model
   if (override === sessionModel) return
   ctx.ui.notify(
     `/lang model is ${override} but the session model is ${sessionModel} — context-mode translations can't reuse the session's prompt cache, so the whole history is re-billed at full input price on every translation, and the entire conversation (not just the translated text) is sent to ${override}'s provider. Run "/lang model default" to follow the session model.`,

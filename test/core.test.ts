@@ -8,6 +8,7 @@ import {
   buildWholeTranslatePrompt,
   CONTEXT_PREFACE,
   resolveModelReference,
+  resolveStoredModelReference,
   getProviderStreamSimple
 } from '../language-learn.ts'
 import { resolveModel } from '../src/llm.ts'
@@ -334,10 +335,11 @@ describe('resolveModel (pi CLI semantics over available/catalog)', () => {
 describe('warnOnCacheMismatch', () => {
   const session = { provider: 'openai', id: 'gpt-4o-mini' }
   const other = { provider: 'zai', id: 'glm-5' }
-  const ctx = (notes: string[]) =>
+  const azureDup = { provider: 'azure', id: 'gpt-4o-mini' }
+  const ctx = (notes: string[], available = [session, other], all = [session, other]) =>
     ({
       model: session,
-      modelRegistry: { getAll: () => [session, other] },
+      modelRegistry: { getAvailable: () => available, getAll: () => all },
       ui: {
         notify: (msg: string) => {
           notes.push(msg)
@@ -361,6 +363,39 @@ describe('warnOnCacheMismatch', () => {
     warnOnCacheMismatch(ctx(notes), lang('glm-5', false) as never)
     expect(notes).toEqual([])
   })
+  it('uses the same available/catalog resolution as runLlm: an unauthed catalog duplicate does not fake a mismatch', () => {
+    const notes: string[] = []
+    warnOnCacheMismatch(
+      ctx(notes, [session, other], [session, other, azureDup]),
+      lang('gpt-4o-mini', true) as never
+    )
+    expect(notes).toEqual([])
+  })
+})
+
+describe('resolveStoredModelReference (saved config refs)', () => {
+  const openai = { provider: 'openai', id: 'gpt-4o-mini' }
+  const openrouter = { provider: 'openrouter', id: 'openai/gpt-4o-mini' }
+  const catalog = [openai, openrouter]
+
+  it('restores a saved canonical ref exactly, as needsAuth when its provider lost auth', () => {
+    expect(resolveStoredModelReference('openai/gpt-4o-mini', [openrouter], catalog)).toEqual({
+      kind: 'needsAuth',
+      model: openai
+    })
+  })
+  it('returns found when the saved canonical ref still has auth', () => {
+    expect(resolveStoredModelReference('openai/gpt-4o-mini', [openai], catalog)).toEqual({
+      kind: 'found',
+      model: openai
+    })
+  })
+  it('falls back to interactive semantics for a hand-edited bare id', () => {
+    expect(resolveStoredModelReference('gpt-4o-mini', [openai], catalog)).toEqual({
+      kind: 'found',
+      model: openai
+    })
+  })
 })
 
 describe('slash-containing refs follow pi CLI semantics (OpenRouter-style ids)', () => {
@@ -374,9 +409,9 @@ describe('slash-containing refs follow pi CLI semantics (OpenRouter-style ids)',
       model: session
     }) as never
 
-  it('unauthed provider ref with a unique authed raw-id lookalike takes the authed model (pi tiebreak)', () => {
+  it('a saved canonical override is restored exactly even when an authed raw-id lookalike exists', () => {
     expect(resolveModel(ctx([openrouter, session]), lang('openai/gpt-4o-mini') as never)).toBe(
-      openrouter
+      openai
     )
   })
   it('the openrouter model stays reachable through its canonical ref', () => {

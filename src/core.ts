@@ -302,3 +302,31 @@ export function resolveModelReference<M extends ModelRefLike>(
   }
   return { kind: 'none' }
 }
+
+/**
+ * Resolve a reference persisted in the config. Unlike interactive input, a
+ * saved canonical `provider/id` is an already-disambiguated answer: restore
+ * it exactly from the catalog — reporting `needsAuth` when its provider lost
+ * auth, so side-calls fail visibly instead of being silently re-routed to an
+ * authed provider whose raw id happens to spell the same. Only references
+ * that match no canonical pair (hand-edited bare ids) fall back to the
+ * interactive {@link resolveModelReference} semantics.
+ */
+export function resolveStoredModelReference<M extends ModelRefLike>(
+  reference: string,
+  available: readonly M[],
+  catalog: readonly M[]
+): ModelResolution<M> {
+  const ref = reference.trim().toLowerCase()
+  if (!ref) return { kind: 'none' }
+
+  const exact = decide(catalog.filter((m) => `${m.provider}/${m.id}`.toLowerCase() === ref))
+  if (exact?.kind === 'found') {
+    const authed = available.some(
+      (m) => m.provider === exact.model.provider && m.id === exact.model.id
+    )
+    return authed ? exact : { kind: 'needsAuth', model: exact.model }
+  }
+
+  return resolveModelReference(reference, available, catalog)
+}
