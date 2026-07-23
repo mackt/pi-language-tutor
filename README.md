@@ -67,13 +67,14 @@ That is enough to start.
 | Command | What it does |
 |---------|--------------|
 | `alt+t` or `/translate` | Translate the last assistant response (bilingual card) |
-| `/lang` | Show current settings |
+| `/lang` | Open the interactive settings menu — every option with an inline description |
 | `/lang on` \| `off` | Resume / pause the writing check |
 | `/lang auto on` \| `off` | Auto-translate every final response |
 | `/lang native <code>` | Set your native language — translation target and explanation language (`zh-CN`, `ja`, …) |
 | `/lang learning <code>` | Set the language you are practicing (`en`, `fr`, …) |
 | `/lang model <provider/id>` | Use a cheaper model for checks and translations |
 | `/lang model default` | Go back to the session model |
+| `/lang context on` \| `off` | Give translations the full session context (off by default; see below) |
 
 ## Configuration
 
@@ -85,7 +86,8 @@ Settings persist in `~/.pi/agent/language-learn.json`; the `/lang` command manag
 	"native": "zh-CN",
 	"model": "openai/gpt-4o-mini",
 	"enabled": true,
-	"auto": false
+	"auto": false,
+	"context": false
 }
 ```
 
@@ -97,6 +99,11 @@ Settings persist in `~/.pi/agent/language-learn.json`; the `/lang` command manag
 
 **Bilingual cards.** Paragraphs are aligned original-then-translation, immersive-translate style. Short code blocks (≤5 lines) are kept in the card; longer ones become a `[code block ↑ N lines]` placeholder since the original sits right above. Auto mode skips intermediate tool-call narration and responses under ~15 words; the footer shows `🌐 auto` while enabled.
 
+**Context mode** (`/lang context on`, off by default). By default translations see only the message being translated, so pronouns, project names, and coined terms can come out generic. Context mode forks the session instead: the translation request replays the exact prefix of the main session's last LLM request (same tools, system prompt, and message history), so the provider serves the whole history from its prompt cache and you pay cache-read prices (~10% of input on Anthropic) plus the translation itself. Two things to know:
+
+- It only pays off when translations use the **session model** — a `/lang model` override can't hit the session's cache, and the whole history would be re-billed at full input price on every translation. The extension warns about this combination at startup and when you switch; `/lang model default` fixes it.
+- Before the first agent turn of a session there is no captured request yet, so translations quietly fall back to context-free.
+
 ## Development
 
 ```sh
@@ -105,4 +112,4 @@ npm run check   # typecheck
 npm test        # unit tests for the skip heuristics and response parsing
 ```
 
-Layout: `src/core.ts` holds the pure logic (heuristics, prompts, parsing, card assembly — what the tests import), `src/config.ts` the config persistence, and `src/index.ts` the pi adapter (the only file that imports pi packages). `language-learn.ts` is the entry point re-exporting them.
+Layout: `src/core.ts` holds the pure logic (heuristics, prompts, parsing, card assembly — what the tests import, zero pi imports) and `src/config.ts` the config persistence. The pi-facing side is split by feature: `src/llm.ts` (model resolution, LLM calls, session-fork tracking), `src/grammar.ts` (writing check), `src/translate.ts` (bilingual cards), `src/settings.ts` (`/lang` command and menu), with `src/index.ts` as the composition root wiring them together. `language-learn.ts` is the entry point re-exporting core and the default export.

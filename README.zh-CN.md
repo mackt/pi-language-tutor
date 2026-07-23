@@ -65,13 +65,14 @@ ln -s "$(pwd)/pi-language-tutor" ~/.pi/agent/extensions/pi-language-tutor
 | 命令                        | 作用                                               |
 | --------------------------- | -------------------------------------------------- |
 | `alt+t` 或 `/translate`     | 翻译 agent 回复（双语卡片）                        |
-| `/lang`                     | 查看当前配置                                       |
+| `/lang`                     | 打开交互式设置菜单，每个选项都有一行说明           |
 | `/lang on` \| `off`         | 恢复/暂停写作检查                                  |
 | `/lang auto on` \| `off`    | 自动翻译每轮最终回复                               |
 | `/lang native <code>`       | 设置母语，即译文和讲解使用的语言（`zh-CN`、`ja`…） |
 | `/lang learning <code>`     | 设置正在学习的语言（`en`、`fr`…）                  |
 | `/lang model <provider/id>` | 用更便宜的模型跑检查和翻译                         |
 | `/lang model default`       | 换回会话模型                                       |
+| `/lang context on` \| `off` | 翻译时携带完整会话上下文（默认关闭，详见下文）     |
 
 ## 配置
 
@@ -83,7 +84,8 @@ ln -s "$(pwd)/pi-language-tutor" ~/.pi/agent/extensions/pi-language-tutor
   "native": "zh-CN",
   "model": "openai/gpt-4o-mini",
   "enabled": true,
-  "auto": false
+  "auto": false,
+  "context": false
 }
 ```
 
@@ -95,6 +97,11 @@ ln -s "$(pwd)/pi-language-tutor" ~/.pi/agent/extensions/pi-language-tutor
 
 **双语卡片。** 段落按「原文在上、译文在下」排列，和沉浸式翻译一个风格。短代码块（≤5 行）原样保留，更长的用 `[code block ↑ N lines]` 占位——完整代码就在上方的原文里。自动模式下，中间的工具调用叙述和少于 15 个词的回复不会翻译；开启时底部状态栏会显示 `🌐 auto`。
 
+**上下文模式**（`/lang context on`，默认关闭）。默认情况下翻译只能看到被翻译的那条消息，代词指代、项目名、会话里约定的术语都可能译得很泛。上下文模式改为从主会话「fork」出翻译请求：完整复用主会话上一次 LLM 请求的前缀（相同的工具定义、系统提示词和消息历史），这样整段历史都能命中服务商的 prompt cache，你只需付缓存读取的价格（Anthropic 约为正常输入价的 10%）加上翻译本身的开销。两点注意：
+
+- 只有翻译使用**会话模型**时才划算——用 `/lang model` 指定了别的模型就无法命中主会话的缓存，每次翻译都会按全价重新计费整段历史。扩展会在启动和切换模型时对这种组合发出提醒；运行 `/lang model default` 即可解决。
+- 会话第一轮 agent 对话之前还没有可复用的请求，此时翻译会静默回退到无上下文模式。
+
 ## 开发
 
 ```sh
@@ -103,4 +110,4 @@ npm run check   # 类型检查
 npm test        # 单元测试：跳过判定和回复解析
 ```
 
-目录结构：`src/core.ts` 放纯逻辑（跳过判定、prompt、解析、卡片拼装，测试只依赖这个文件），`src/config.ts` 负责配置读写，`src/index.ts` 是 pi 适配层（唯一 import pi 包的文件），`language-learn.ts` 是入口，重新导出以上模块。
+目录结构：`src/core.ts` 放纯逻辑（跳过判定、prompt、解析、卡片拼装，测试只依赖这个文件，不 import 任何 pi 包），`src/config.ts` 负责配置读写。pi 适配层按特性拆分：`src/llm.ts`（模型解析、LLM 调用、会话 fork 捕获）、`src/grammar.ts`（写作检查）、`src/translate.ts`（双语卡片）、`src/settings.ts`（`/lang` 命令和设置菜单），`src/index.ts` 是组装根，把它们接到 pi 上。`language-learn.ts` 是入口，重新导出核心模块。
