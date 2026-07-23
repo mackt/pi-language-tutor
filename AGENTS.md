@@ -44,7 +44,8 @@ runtime files outside `src/`, update it and sanity-check `npm pack --dry-run`.
 ## Design ground rules
 
 - `src/core.ts` stays pure: zero pi imports, no I/O — it is the unit-test
-  surface (`test.mjs`). New logic goes there when it doesn't need pi APIs.
+  surface (`test/core.test.ts`, run by vitest). New logic goes
+  there when it doesn't need pi APIs.
 - Feature modules (`llm.ts`, `grammar.ts`, `translate.ts`, `settings.ts`)
   keep one-way dependencies and expose minimal interfaces; `index.ts` stays
   a thin composition root.
