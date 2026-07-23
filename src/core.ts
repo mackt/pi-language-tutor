@@ -218,3 +218,124 @@ export function cardMarkdown(segments: CardSegment[]): string {
     })
     .join('\n\n')
 }
+
+/** The subset of a registry model a reference can be matched against. */
+export interface ModelRefLike {
+  provider: string
+  id: string
+}
+
+export type ModelResolution<M extends ModelRefLike> =
+  /** Resolved to a model with configured auth. */
+  | { kind: 'found'; model: M }
+  /** Resolved, but the model's provider has no configured auth. */
+  | { kind: 'needsAuth'; model: M }
+  /** Several configured-auth models match a bare id. */
+  | { kind: 'ambiguous'; candidates: M[] }
+  /** Only unconfigured providers' catalogs list this bare id. */
+  | { kind: 'noAuthAnywhere'; candidates: M[] }
+  | { kind: 'none' }
+
+function decide<M extends ModelRefLike>(
+  matches: M[]
+): { kind: 'found'; model: M } | { kind: 'ambiguous'; candidates: M[] } | undefined {
+  if (matches.length === 1) return { kind: 'found', model: matches[0] }
+  if (matches.length > 1) return { kind: 'ambiguous', candidates: matches }
+  return undefined
+}
+
+/**
+ * Resolve a user-supplied model reference the way pi's CLI `-m` does
+ * (`core/model-resolver.ts`, not re-exported by the package):
+ *
+ * 1. When the prefix before the first slash names a known provider, prefer
+ *    the `provider/id` interpretation ("zai/glm-5" is zai's glm-5, not a
+ *    gateway model whose id is literally "zai/glm-5").
+ * 2. If that interpretation exists only without auth while exactly one
+ *    configured-auth model's raw id equals the whole reference, prefer the
+ *    authenticated one (ids like "xiaomi/mimo-v2.5-pro" where the prefix
+ *    happens to name a provider).
+ * 3. Otherwise fall back to matching the whole reference as a canonical
+ *    `provider/id` or a raw model id — OpenRouter-style ids keep working.
+ *
+ * All comparisons are case-insensitive. `available` is the configured-auth
+ * subset of `catalog`; pass the same list twice to resolve identity only.
+ */
+export function resolveModelReference<M extends ModelRefLike>(
+  reference: string,
+  available: readonly M[],
+  catalog: readonly M[]
+): ModelResolution<M> {
+  const ref = reference.trim().toLowerCase()
+  if (!ref) return { kind: 'none' }
+
+  const slash = ref.indexOf('/')
+  if (slash > 0 && slash < ref.length - 1) {
+    const prefix = ref.slice(0, slash)
+    if (catalog.some((m) => m.provider.toLowerCase() === prefix)) {
+      const id = ref.slice(slash + 1)
+      const inProvider = (models: readonly M[]) =>
+        models.filter((m) => m.provider.toLowerCase() === prefix && m.id.toLowerCase() === id)
+      const availableHit = decide(inProvider(available))
+      if (availableHit) return availableHit
+      const catalogHit = decide(inProvider(catalog))
+      if (catalogHit?.kind === 'found') {
+        const rawMatches = available.filter((m) => m.id.toLowerCase() === ref)
+        if (rawMatches.length === 1) return { kind: 'found', model: rawMatches[0] }
+        return { kind: 'needsAuth', model: catalogHit.model }
+      }
+      // Known provider but no such model under it: fall through — the whole
+      // reference may still be a raw model id elsewhere.
+    }
+  }
+
+  const whole = (models: readonly M[]) =>
+    models.filter(
+      (m) => m.id.toLowerCase() === ref || `${m.provider}/${m.id}`.toLowerCase() === ref
+    )
+  const availableHit = decide(whole(available))
+  if (availableHit) return availableHit
+  const catalogHit = decide(whole(catalog))
+  if (catalogHit?.kind === 'found') return { kind: 'needsAuth', model: catalogHit.model }
+  if (catalogHit?.kind === 'ambiguous') {
+    return { kind: 'noAuthAnywhere', candidates: catalogHit.candidates }
+  }
+  return { kind: 'none' }
+}
+
+/**
+ * Resolve a reference persisted in the config. Unlike interactive input, a
+ * saved canonical `provider/id` is an already-disambiguated answer: restore
+ * it exactly from the catalog — reporting `needsAuth` when its provider lost
+ * auth, so side-calls fail visibly instead of being silently re-routed to an
+ * authed provider whose raw id happens to spell the same. A ref whose prefix
+ * names a known provider but whose exact model left the catalog (dropped or
+ * renamed) resolves to nothing — the caller falls back to the session model —
+ * rather than raw-matching the string onto another provider's lookalike id.
+ * Only refs not interpretable as a provider choice (hand-edited bare ids, or
+ * raw ids whose prefix is no provider) fall back to the interactive
+ * {@link resolveModelReference} semantics.
+ */
+export function resolveStoredModelReference<M extends ModelRefLike>(
+  reference: string,
+  available: readonly M[],
+  catalog: readonly M[]
+): ModelResolution<M> {
+  const ref = reference.trim().toLowerCase()
+  if (!ref) return { kind: 'none' }
+
+  const exact = decide(catalog.filter((m) => `${m.provider}/${m.id}`.toLowerCase() === ref))
+  if (exact?.kind === 'found') {
+    const authed = available.some(
+      (m) => m.provider === exact.model.provider && m.id === exact.model.id
+    )
+    return authed ? exact : { kind: 'needsAuth', model: exact.model }
+  }
+
+  const slash = ref.indexOf('/')
+  if (slash > 0 && catalog.some((m) => m.provider.toLowerCase() === ref.slice(0, slash))) {
+    return { kind: 'none' }
+  }
+
+  return resolveModelReference(reference, available, catalog)
+}

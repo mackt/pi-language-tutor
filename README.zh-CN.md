@@ -72,7 +72,7 @@ ln -s "$(pwd)/pi-language-tutor" ~/.pi/agent/extensions/pi-language-tutor
 | `/lang auto on` \| `off`    | 自动翻译每轮最终回复                               |
 | `/lang native <code>`       | 设置母语，即译文和讲解使用的语言（`zh-CN`、`ja`…） |
 | `/lang learning <code>`     | 设置正在学习的语言（`en`、`fr`…）                  |
-| `/lang model <provider/id>` | 用更便宜的模型跑检查和翻译                         |
+| `/lang model [model]`       | 指定本插件使用的模型                               |
 | `/lang model default`       | 换回会话模型                                       |
 | `/lang context on` \| `off` | 翻译时携带完整会话上下文（默认关闭，详见下文）     |
 

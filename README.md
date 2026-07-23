@@ -74,7 +74,7 @@ Type `/lang` in the TUI to open the interactive settings menu, or set things dir
 | `/lang auto on` \| `off`    | Auto-translate every final response                                                       |
 | `/lang native <code>`       | Set your native language — translation target and explanation language (`zh-CN`, `ja`, …) |
 | `/lang learning <code>`     | Set the language you are practicing (`en`, `fr`, …)                                       |
-| `/lang model <provider/id>` | Use a cheaper model for checks and translations                                           |
+| `/lang model [model]`       | Set the model this extension uses                                                         |
 | `/lang model default`       | Go back to the session model                                                              |
 | `/lang context on` \| `off` | Give translations the full session context (off by default; see below)                    |
 

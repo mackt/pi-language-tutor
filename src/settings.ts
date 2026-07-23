@@ -16,6 +16,7 @@ import {
   Text
 } from '@earendil-works/pi-tui'
 import { loadConfig, saveConfig } from './config.ts'
+import { resolveModelReference, resolveStoredModelReference } from './core.ts'
 import type { Config } from './core.ts'
 
 export const STATUS_KEY = 'language-learn'
@@ -33,15 +34,69 @@ export function updateStatus(ctx: ExtensionContext, cfg: Config): void {
 export function warnOnCacheMismatch(ctx: ExtensionContext, cfg: Config): void {
   if (!cfg.context || !cfg.model || cfg.model === 'default' || !ctx.model) return
   const sessionModel = `${ctx.model.provider}/${ctx.model.id}`
-  if (cfg.model === sessionModel) return
+  // A hand-edited config may hold a bare id or a differently-cased ref that
+  // still resolves to the session model; compare resolved identities, not
+  // the raw string — using the exact same resolution runLlm's resolveModel
+  // uses, so the warning never contradicts what actually happens.
+  const match = resolveStoredModelReference(
+    cfg.model,
+    ctx.modelRegistry.getAvailable(),
+    ctx.modelRegistry.getAll()
+  )
+  const override =
+    match.kind === 'found' || match.kind === 'needsAuth'
+      ? `${match.model.provider}/${match.model.id}`
+      : cfg.model
+  if (override === sessionModel) return
   ctx.ui.notify(
-    `/lang model is ${cfg.model} but the session model is ${sessionModel} — context-mode translations can't reuse the session's prompt cache, so the whole history is re-billed at full input price on every translation, and the entire conversation (not just the translated text) is sent to ${cfg.model}'s provider. Run "/lang model default" to follow the session model.`,
+    `/lang model is ${override} but the session model is ${sessionModel} — context-mode translations can't reuse the session's prompt cache, so the whole history is re-billed at full input price on every translation, and the entire conversation (not just the translated text) is sent to ${override}'s provider. Run "/lang model default" to follow the session model.`,
     'warning'
   )
 }
 
+/** Options for the model pickers: default (session model) + configured-auth models. */
+function modelOptions(ctx: ExtensionContext): SelectItem[] {
+  return [
+    { value: 'default', label: 'default', description: 'follow the session model' },
+    ...ctx.modelRegistry.getAvailable().map((m) => ({
+      value: `${m.provider}/${m.id}`,
+      label: `${m.provider}/${m.id}`,
+      description: m.name
+    }))
+  ]
+}
+
+/** Standalone model picker for bare `/lang model` — same list as the menu's submenu. */
+async function openModelPicker(ctx: ExtensionContext, cfg: Config): Promise<void> {
+  const selected = await ctx.ui.custom<string | undefined>((tui, theme, _kb, done) => {
+    const options = modelOptions(ctx)
+    const list = new SelectList(options, Math.min(options.length, 10), getSelectListTheme())
+    const preselect = options.findIndex((o) => o.value === (cfg.model ?? 'default'))
+    if (preselect >= 0) list.setSelectedIndex(preselect)
+    list.onSelect = (item) => done(item.value)
+    list.onCancel = () => done(undefined)
+    return {
+      render: (width: number) => [
+        theme.fg('accent', theme.bold(' Model')),
+        '',
+        ...list.render(width)
+      ],
+      invalidate: () => {},
+      handleInput: (data: string) => {
+        list.handleInput(data)
+        tui.requestRender()
+      }
+    }
+  })
+  if (selected === undefined) return
+  cfg.model = selected === 'default' ? undefined : selected
+  saveConfig(cfg)
+  if (cfg.model) warnOnCacheMismatch(ctx, cfg)
+  updateStatus(ctx, cfg)
+}
+
 const LANG_USAGE =
-  'Usage: /lang  (settings menu)  |  /lang on|off  |  /lang auto|context on|off  |  /lang native|learning <code>  |  /lang model <provider/id|default>'
+  'Usage: /lang  (settings menu)  |  /lang on|off  |  /lang auto|context on|off  |  /lang native|learning <code>  |  /lang model [provider/id|id|default]'
 
 const LANGUAGE_PRESETS: ReadonlyArray<{ code: string; name: string }> = [
   { code: 'en', name: 'English' },
@@ -164,14 +219,7 @@ export function registerLangSettings(pi: ExtensionAPI, deps: SettingsDeps): void
 
       /** Submenu: models with configured auth (same source as the built-in /model selector). */
       const modelSubmenu = (currentValue: string, submenuDone: (value?: string) => void) => {
-        const options: SelectItem[] = [
-          { value: 'default', label: 'default', description: 'follow the session model' },
-          ...ctx.modelRegistry.getAvailable().map((m) => ({
-            value: `${m.provider}/${m.id}`,
-            label: `${m.provider}/${m.id}`,
-            description: m.name
-          }))
-        ]
+        const options = modelOptions(ctx)
         const list = new SelectList(options, Math.min(options.length, 10), getSelectListTheme())
         const preselect = options.findIndex((o) => o.value === currentValue)
         if (preselect >= 0) list.setSelectedIndex(preselect)
@@ -333,32 +381,58 @@ export function registerLangSettings(pi: ExtensionAPI, deps: SettingsDeps): void
           break
         case 'model':
           if (!value) {
-            ctx.ui.notify('Usage: /lang model <provider/id> or /lang model default', 'warning')
+            if (ctx.hasUI && ctx.mode === 'tui') {
+              await openModelPicker(ctx, cfg)
+              show()
+            } else {
+              ctx.ui.notify(
+                'Usage: /lang model <provider/id>, a unique model id, or default',
+                'warning'
+              )
+            }
             return
           }
           if (value === 'default') {
             cfg.model = undefined
           } else {
-            const slash = value.indexOf('/')
-            const found =
-              slash > 0
-                ? ctx.modelRegistry.find(value.slice(0, slash), value.slice(slash + 1))
-                : undefined
-            if (!found) {
-              ctx.ui.notify(`Model not found: ${value} (expected <provider>/<id>)`, 'warning')
+            // pi CLI's -m semantics: provider-prefix interpretation first,
+            // auth-aware tiebreak, then the whole reference as a raw model id
+            // (OpenRouter-style). The full catalog shapes the errors, to tell
+            // "needs /login" apart from "does not exist".
+            const resolved = resolveModelReference(
+              value,
+              ctx.modelRegistry.getAvailable(),
+              ctx.modelRegistry.getAll()
+            )
+            if (resolved.kind === 'ambiguous') {
+              const refs = resolved.candidates.map((m) => `${m.provider}/${m.id}`).join(', ')
+              ctx.ui.notify(`Ambiguous model id: ${value} — use one of: ${refs}`, 'warning')
               return
             }
-            const hasAuth = ctx.modelRegistry
-              .getAvailable()
-              .some((m) => m.provider === found.provider && m.id === found.id)
-            if (!hasAuth) {
+            if (resolved.kind === 'needsAuth') {
               ctx.ui.notify(
-                `No auth configured for ${value} — run /login ${found.provider} first`,
+                `No auth configured for ${resolved.model.provider}/${resolved.model.id} — run /login ${resolved.model.provider} first`,
                 'warning'
               )
               return
             }
-            cfg.model = value
+            if (resolved.kind === 'noAuthAnywhere') {
+              const refs = resolved.candidates.map((m) => `${m.provider}/${m.id}`).join(', ')
+              ctx.ui.notify(
+                `No auth configured for any provider of ${value} (${refs}) — run /login first`,
+                'warning'
+              )
+              return
+            }
+            if (resolved.kind === 'none') {
+              ctx.ui.notify(
+                `Model not found: ${value} (expected <provider>/<id> or a unique model id)`,
+                'warning'
+              )
+              return
+            }
+            const found = resolved.model
+            cfg.model = `${found.provider}/${found.id}`
             warnOnCacheMismatch(ctx, cfg)
           }
           saveConfig(cfg)

@@ -7,9 +7,13 @@ import {
   buildSegmentPrompt,
   buildWholeTranslatePrompt,
   CONTEXT_PREFACE,
+  resolveModelReference,
+  resolveStoredModelReference,
   getProviderStreamSimple
 } from '../language-learn.ts'
+import { resolveModel } from '../src/llm.ts'
 import type { StreamSimpleRegistry } from '../src/llm.ts'
+import { warnOnCacheMismatch } from '../src/settings.ts'
 
 describe('shouldSkipCheck', () => {
   describe('inputs that must be skipped', () => {
@@ -220,5 +224,223 @@ describe('getProviderStreamSimple (custom providers, e.g. cursor-sdk)', () => {
     expect(
       getProviderStreamSimple(registry(undefined), { provider: 'cursor', api: 'cursor-sdk' })
     ).toBeUndefined()
+  })
+})
+
+describe('resolveModelReference (pi CLI -m semantics)', () => {
+  const zai = { provider: 'zai', id: 'glm-5' }
+  const gateway = { provider: 'gateway', id: 'zai/glm-5' }
+  const openai = { provider: 'openai', id: 'gpt-4o-mini' }
+  const azure = { provider: 'azure', id: 'gpt-4o-mini' }
+  const catalog = [zai, gateway, openai, azure]
+
+  it('prefers the provider interpretation over a raw-id lookalike', () => {
+    expect(resolveModelReference('zai/glm-5', catalog, catalog)).toEqual({
+      kind: 'found',
+      model: zai
+    })
+  })
+  it('canonical ref reaches a model whose id contains a slash', () => {
+    expect(resolveModelReference('gateway/zai/glm-5', catalog, catalog)).toEqual({
+      kind: 'found',
+      model: gateway
+    })
+  })
+  it('auth-aware tiebreak: unauthed provider ref falls to the unique authed raw id', () => {
+    expect(resolveModelReference('zai/glm-5', [gateway], catalog)).toEqual({
+      kind: 'found',
+      model: gateway
+    })
+  })
+  it('needsAuth when the provider ref has no authed raw-id lookalike', () => {
+    expect(resolveModelReference('openai/gpt-4o-mini', [azure], catalog)).toEqual({
+      kind: 'needsAuth',
+      model: openai
+    })
+  })
+  it('known provider without that model still matches the whole ref as a raw id', () => {
+    const zaiOther = { provider: 'zai', id: 'glm-4' }
+    expect(resolveModelReference('zai/glm-5', [gateway, zaiOther], [gateway, zaiOther])).toEqual({
+      kind: 'found',
+      model: gateway
+    })
+  })
+  it('resolves a unique bare id among configured-auth models', () => {
+    expect(resolveModelReference('glm-5', [zai, openai], catalog)).toEqual({
+      kind: 'found',
+      model: zai
+    })
+  })
+  it('reports an ambiguous bare id with its candidates', () => {
+    expect(resolveModelReference('gpt-4o-mini', catalog, catalog)).toEqual({
+      kind: 'ambiguous',
+      candidates: [openai, azure]
+    })
+  })
+  it('bare id known only to unconfigured catalogs reports noAuthAnywhere', () => {
+    expect(resolveModelReference('gpt-4o-mini', [], catalog)).toEqual({
+      kind: 'noAuthAnywhere',
+      candidates: [openai, azure]
+    })
+  })
+  it('matches case-insensitively', () => {
+    expect(resolveModelReference('ZAI/GLM-5', catalog, catalog).kind).toBe('found')
+  })
+  it('unknown reference', () => {
+    expect(resolveModelReference('gpt-nonexistent', catalog, catalog)).toEqual({ kind: 'none' })
+  })
+  it('empty reference', () => {
+    expect(resolveModelReference('  ', catalog, catalog)).toEqual({ kind: 'none' })
+  })
+})
+
+const lang = (model?: string, context = false) => ({
+  learning: 'en',
+  native: 'zh-CN',
+  model,
+  enabled: true,
+  auto: false,
+  context
+})
+
+describe('resolveModel (pi CLI semantics over available/catalog)', () => {
+  const openai = { provider: 'openai', id: 'gpt-4o-mini' }
+  const azure = { provider: 'azure', id: 'gpt-4o-mini' }
+  const cloudflare = { provider: 'cloudflare', id: 'gpt-4o-mini' }
+  const session = { provider: 'anthropic', id: 'claude-sonnet-5' }
+  const catalog = [openai, azure, cloudflare, session]
+  const ctx = (available: unknown[]) =>
+    ({
+      modelRegistry: { getAvailable: () => available, getAll: () => catalog },
+      model: session
+    }) as never
+
+  it('resolves a bare id against configured-auth models even when other catalogs list it', () => {
+    expect(resolveModel(ctx([openai, session]), lang('gpt-4o-mini') as never)).toBe(openai)
+  })
+  it('an override that lost auth still resolves from the catalog (fails visibly later)', () => {
+    expect(resolveModel(ctx([session]), lang('openai/gpt-4o-mini') as never)).toBe(openai)
+  })
+  it('a bare id ambiguous among available models falls back to the session model', () => {
+    expect(resolveModel(ctx([openai, azure, session]), lang('gpt-4o-mini') as never)).toBe(session)
+  })
+  it('an unknown override falls back to the session model', () => {
+    expect(resolveModel(ctx([session]), lang('gpt-nonexistent') as never)).toBe(session)
+  })
+  it('no override uses the session model', () => {
+    expect(resolveModel(ctx([session]), lang(undefined) as never)).toBe(session)
+  })
+})
+
+describe('warnOnCacheMismatch', () => {
+  const session = { provider: 'openai', id: 'gpt-4o-mini' }
+  const other = { provider: 'zai', id: 'glm-5' }
+  const azureDup = { provider: 'azure', id: 'gpt-4o-mini' }
+  const ctx = (notes: string[], available = [session, other], all = [session, other]) =>
+    ({
+      model: session,
+      modelRegistry: { getAvailable: () => available, getAll: () => all },
+      ui: {
+        notify: (msg: string) => {
+          notes.push(msg)
+        }
+      }
+    }) as never
+
+  it('does not warn when a hand-edited ref resolves to the session model', () => {
+    const notes: string[] = []
+    warnOnCacheMismatch(ctx(notes), lang('GPT-4O-MINI', true) as never)
+    expect(notes).toEqual([])
+  })
+  it('warns when the override resolves to a different model', () => {
+    const notes: string[] = []
+    warnOnCacheMismatch(ctx(notes), lang('glm-5', true) as never)
+    expect(notes).toHaveLength(1)
+    expect(notes[0]).toContain('zai/glm-5')
+  })
+  it('stays quiet while context mode is off', () => {
+    const notes: string[] = []
+    warnOnCacheMismatch(ctx(notes), lang('glm-5', false) as never)
+    expect(notes).toEqual([])
+  })
+  it('uses the same available/catalog resolution as runLlm: an unauthed catalog duplicate does not fake a mismatch', () => {
+    const notes: string[] = []
+    warnOnCacheMismatch(
+      ctx(notes, [session, other], [session, other, azureDup]),
+      lang('gpt-4o-mini', true) as never
+    )
+    expect(notes).toEqual([])
+  })
+})
+
+describe('resolveStoredModelReference (saved config refs)', () => {
+  const openai = { provider: 'openai', id: 'gpt-4o-mini' }
+  const openrouter = { provider: 'openrouter', id: 'openai/gpt-4o-mini' }
+  const catalog = [openai, openrouter]
+
+  it('restores a saved canonical ref exactly, as needsAuth when its provider lost auth', () => {
+    expect(resolveStoredModelReference('openai/gpt-4o-mini', [openrouter], catalog)).toEqual({
+      kind: 'needsAuth',
+      model: openai
+    })
+  })
+  it('returns found when the saved canonical ref still has auth', () => {
+    expect(resolveStoredModelReference('openai/gpt-4o-mini', [openai], catalog)).toEqual({
+      kind: 'found',
+      model: openai
+    })
+  })
+  it('falls back to interactive semantics for a hand-edited bare id', () => {
+    expect(resolveStoredModelReference('gpt-4o-mini', [openai], catalog)).toEqual({
+      kind: 'found',
+      model: openai
+    })
+  })
+  it('a saved provider ref whose model left the catalog is not raw-matched onto a lookalike', () => {
+    const openaiOther = { provider: 'openai', id: 'gpt-4o' }
+    expect(
+      resolveStoredModelReference('openai/gpt-4o-mini', [openrouter], [openaiOther, openrouter])
+    ).toEqual({ kind: 'none' })
+  })
+  it('a raw id whose prefix names no provider still resolves interactively', () => {
+    const orphan = { provider: 'openrouter', id: 'mistral/devstral' }
+    expect(resolveStoredModelReference('mistral/devstral', [orphan], [orphan])).toEqual({
+      kind: 'found',
+      model: orphan
+    })
+  })
+})
+
+describe('slash-containing refs follow pi CLI semantics (OpenRouter-style ids)', () => {
+  const openai = { provider: 'openai', id: 'gpt-4o-mini' }
+  const openrouter = { provider: 'openrouter', id: 'openai/gpt-4o-mini' }
+  const session = { provider: 'anthropic', id: 'claude-sonnet-5' }
+  const catalog = [openai, openrouter, session]
+  const ctx = (available: unknown[]) =>
+    ({
+      modelRegistry: { getAvailable: () => available, getAll: () => catalog },
+      model: session
+    }) as never
+
+  it('a saved canonical override is restored exactly even when an authed raw-id lookalike exists', () => {
+    expect(resolveModel(ctx([openrouter, session]), lang('openai/gpt-4o-mini') as never)).toBe(
+      openai
+    )
+  })
+  it('the openrouter model stays reachable through its canonical ref', () => {
+    expect(
+      resolveModel(ctx([openrouter, session]), lang('openrouter/openai/gpt-4o-mini') as never)
+    ).toBe(openrouter)
+  })
+  it('a slash-containing reference matching no catalog provider still resolves as a bare id', () => {
+    const orphan = { provider: 'openrouter', id: 'mistral/devstral' }
+    const orphanCtx = {
+      modelRegistry: { getAvailable: () => [orphan, session], getAll: () => [orphan, session] },
+      model: session
+    } as never
+    expect(resolveModel(orphanCtx, lang('mistral/devstral') as never)).toBe(orphan)
+  })
+  it('a bare id that lost auth everywhere still resolves from the catalog (fails visibly later)', () => {
+    expect(resolveModel(ctx([session]), lang('gpt-4o-mini') as never)).toBe(openai)
   })
 })

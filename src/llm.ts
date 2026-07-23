@@ -15,6 +15,7 @@ import type {
 } from '@earendil-works/pi-ai/compat'
 import { convertToLlm } from '@earendil-works/pi-coding-agent'
 import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-agent'
+import { resolveStoredModelReference } from './core.ts'
 import type { Config } from './core.ts'
 
 export type ResolvedModel = NonNullable<ExtensionContext['model']>
@@ -91,11 +92,17 @@ async function completeWithModel(
 /** The model to use for checks and translations: the configured override, else the session model. */
 export function resolveModel(ctx: ExtensionContext, cfg: Config): ResolvedModel | undefined {
   if (cfg.model && cfg.model !== 'default') {
-    const slash = cfg.model.indexOf('/')
-    if (slash > 0) {
-      const found = ctx.modelRegistry.find(cfg.model.slice(0, slash), cfg.model.slice(slash + 1))
-      if (found) return found
-    }
+    // A saved canonical provider/id is restored exactly; only hand-edited
+    // bare ids go through CLI-style disambiguation. `needsAuth` is returned
+    // too: an override whose provider lost its auth (/logout, env var
+    // removed) must fail visibly at runLlm's auth check, not silently
+    // re-route side-calls to another provider.
+    const resolved = resolveStoredModelReference(
+      cfg.model,
+      ctx.modelRegistry.getAvailable(),
+      ctx.modelRegistry.getAll()
+    )
+    if (resolved.kind === 'found' || resolved.kind === 'needsAuth') return resolved.model
   }
   return ctx.model
 }
