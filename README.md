@@ -36,7 +36,7 @@ ln -s "$(pwd)/pi-language-tutor" ~/.pi/agent/extensions/pi-language-tutor
 
 ## Try this first
 
-1. Start `pi` and send a prompt in your learning language, mistakes and all:
+1. Start `pi` and send a prompt in your learning language:
 
    ```text
    when agent anwser me, I want translate it, it have three feature
@@ -62,11 +62,13 @@ That is enough to start.
 - **Nothing pollutes the conversation.** Translation cards live only in your terminal — they are never sent back to the LLM and cost no context.
 - **You control the spend.** Both features use your session model by default; point them at a cheaper one with `/lang model` and every check becomes nearly free.
 
-## Commands
+## Settings
+
+Type `/lang` in the TUI to open the interactive settings menu, or set things directly with the commands below.
 
 | Command | What it does |
 |---------|--------------|
-| `alt+t` or `/translate` | Translate the last assistant response (bilingual card) |
+| `/translate` or `alt+t` | Translate the last assistant response (bilingual card) |
 | `/lang` | Open the interactive settings menu — every option with an inline description |
 | `/lang on` \| `off` | Resume / pause the writing check |
 | `/lang auto on` \| `off` | Auto-translate every final response |
@@ -78,7 +80,7 @@ That is enough to start.
 
 ## Configuration
 
-Settings persist in `~/.pi/agent/language-learn.json`. Type `/lang` for an interactive settings menu (arrow keys, Enter to toggle or open a submenu, every option explained inline), or use the direct commands from the table above — you rarely edit the file by hand.
+Settings persist in `~/.pi/agent/language-learn.json`.
 
 ```json
 {
@@ -91,7 +93,7 @@ Settings persist in `~/.pi/agent/language-learn.json`. Type `/lang` for an inter
 }
 ```
 
-`model` is optional — when unset, the session model is used.
+`model` defaults to the session model.
 
 ## Details
 

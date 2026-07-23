@@ -34,7 +34,7 @@ ln -s "$(pwd)/pi-language-tutor" ~/.pi/agent/extensions/pi-language-tutor
 
 ## 快速上手
 
-1. 启动 `pi`，用你正在学的语言发条 prompt，写错了也没关系：
+1. 启动 `pi`，用你正在学的语言发条 prompt：
 
    ```text
    when agent anwser me, I want translate it, it have three feature
@@ -60,11 +60,13 @@ ln -s "$(pwd)/pi-language-tutor" ~/.pi/agent/extensions/pi-language-tutor
 - **绝不污染对话。** 翻译卡片只显示在你的终端里，不会发回给 LLM，也不占上下文。
 - **花费你说了算。** 两个功能默认用当前会话的模型；用 `/lang model` 换个便宜模型，每次检查的成本就小到可以忽略。
 
-## 命令
+## 设置
+
+在 TUI 中输入 `/lang` 打开交互式设置菜单，也可以用下面的命令直接设置。
 
 | 命令                        | 作用                                               |
 | --------------------------- | -------------------------------------------------- |
-| `alt+t` 或 `/translate`     | 翻译 agent 回复（双语卡片）                        |
+| `/translate` 或 `alt+t`     | 翻译 agent 回复（双语卡片）                        |
 | `/lang`                     | 打开交互式设置菜单，每个选项都有一行说明           |
 | `/lang on` \| `off`         | 恢复/暂停写作检查                                  |
 | `/lang auto on` \| `off`    | 自动翻译每轮最终回复                               |
@@ -76,7 +78,7 @@ ln -s "$(pwd)/pi-language-tutor" ~/.pi/agent/extensions/pi-language-tutor
 
 ## 配置
 
-配置保存在 `~/.pi/agent/language-learn.json`。输入 `/lang` 打开交互式设置菜单（方向键移动，Enter 切换开关或进入子菜单，每个选项都有说明），也可以用上表的命令直接设置，基本不用手动编辑这个文件。
+配置保存在 `~/.pi/agent/language-learn.json`。
 
 ```json
 {
@@ -89,7 +91,7 @@ ln -s "$(pwd)/pi-language-tutor" ~/.pi/agent/extensions/pi-language-tutor
 }
 ```
 
-`model` 可以不填，默认用当前会话的模型。
+`model` 默认用当前会话的模型。
 
 ## 更多细节
 
