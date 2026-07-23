@@ -34,9 +34,14 @@ export function updateStatus(ctx: ExtensionContext, cfg: Config): void {
 export function warnOnCacheMismatch(ctx: ExtensionContext, cfg: Config): void {
   if (!cfg.context || !cfg.model || cfg.model === 'default' || !ctx.model) return
   const sessionModel = `${ctx.model.provider}/${ctx.model.id}`
-  if (cfg.model === sessionModel) return
+  // A hand-edited config may hold a bare id or a differently-cased ref that
+  // still resolves to the session model; compare resolved identities, not
+  // the raw string.
+  const match = matchModelReference(cfg.model, ctx.modelRegistry.getAll())
+  const override = match.kind === 'found' ? `${match.model.provider}/${match.model.id}` : cfg.model
+  if (override === sessionModel) return
   ctx.ui.notify(
-    `/lang model is ${cfg.model} but the session model is ${sessionModel} — context-mode translations can't reuse the session's prompt cache, so the whole history is re-billed at full input price on every translation, and the entire conversation (not just the translated text) is sent to ${cfg.model}'s provider. Run "/lang model default" to follow the session model.`,
+    `/lang model is ${override} but the session model is ${sessionModel} — context-mode translations can't reuse the session's prompt cache, so the whole history is re-billed at full input price on every translation, and the entire conversation (not just the translated text) is sent to ${override}'s provider. Run "/lang model default" to follow the session model.`,
     'warning'
   )
 }

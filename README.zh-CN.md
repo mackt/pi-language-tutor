@@ -64,17 +64,17 @@ ln -s "$(pwd)/pi-language-tutor" ~/.pi/agent/extensions/pi-language-tutor
 
 在 TUI 中输入 `/lang` 打开交互式设置菜单，也可以用下面的命令直接设置。
 
-| 命令                        | 作用                                                                          |
-| --------------------------- | ----------------------------------------------------------------------------- |
-| `/translate` 或 `alt+t`     | 翻译 agent 回复（双语卡片）                                                   |
-| `/lang`                     | 打开交互式设置菜单，每个选项都有一行说明                                      |
-| `/lang on` \| `off`         | 恢复/暂停写作检查                                                             |
-| `/lang auto on` \| `off`    | 自动翻译每轮最终回复                                                          |
-| `/lang native <code>`       | 设置母语，即译文和讲解使用的语言（`zh-CN`、`ja`…）                            |
-| `/lang learning <code>`     | 设置正在学习的语言（`en`、`fr`…）                                             |
-| `/lang model <model>`       | 用更便宜的模型跑检查和翻译——写 `provider/id`，模型 id 全局唯一时也可以只写 id |
-| `/lang model default`       | 换回会话模型                                                                  |
-| `/lang context on` \| `off` | 翻译时携带完整会话上下文（默认关闭，详见下文）                                |
+| 命令                        | 作用                                                                                                |
+| --------------------------- | --------------------------------------------------------------------------------------------------- |
+| `/translate` 或 `alt+t`     | 翻译 agent 回复（双语卡片）                                                                         |
+| `/lang`                     | 打开交互式设置菜单，每个选项都有一行说明                                                            |
+| `/lang on` \| `off`         | 恢复/暂停写作检查                                                                                   |
+| `/lang auto on` \| `off`    | 自动翻译每轮最终回复                                                                                |
+| `/lang native <code>`       | 设置母语，即译文和讲解使用的语言（`zh-CN`、`ja`…）                                                  |
+| `/lang learning <code>`     | 设置正在学习的语言（`en`、`fr`…）                                                                   |
+| `/lang model <model>`       | 用更便宜的模型跑检查和翻译——写 `provider/id`，模型 id 在已配置认证的 provider 中唯一时也可以只写 id |
+| `/lang model default`       | 换回会话模型                                                                                        |
+| `/lang context on` \| `off` | 翻译时携带完整会话上下文（默认关闭，详见下文）                                                      |
 
 ## 配置
 

@@ -10,7 +10,9 @@ import {
   matchModelReference,
   getProviderStreamSimple
 } from '../language-learn.ts'
+import { resolveModel } from '../src/llm.ts'
 import type { StreamSimpleRegistry } from '../src/llm.ts'
+import { warnOnCacheMismatch } from '../src/settings.ts'
 
 describe('shouldSkipCheck', () => {
   describe('inputs that must be skipped', () => {
@@ -270,5 +272,75 @@ describe('matchModelReference', () => {
   })
   it('empty reference', () => {
     expect(matchModelReference('  ', models)).toEqual({ kind: 'none' })
+  })
+})
+
+const lang = (model?: string, context = false) => ({
+  learning: 'en',
+  native: 'zh-CN',
+  model,
+  enabled: true,
+  auto: false,
+  context
+})
+
+describe('resolveModel (available-first, catalog fallback)', () => {
+  const openai = { provider: 'openai', id: 'gpt-4o-mini' }
+  const azure = { provider: 'azure', id: 'gpt-4o-mini' }
+  const cloudflare = { provider: 'cloudflare', id: 'gpt-4o-mini' }
+  const session = { provider: 'anthropic', id: 'claude-sonnet-5' }
+  const catalog = [openai, azure, cloudflare, session]
+  const ctx = (available: unknown[]) =>
+    ({
+      modelRegistry: { getAvailable: () => available, getAll: () => catalog },
+      model: session
+    }) as never
+
+  it('resolves a bare id against configured-auth models even when other catalogs list it', () => {
+    expect(resolveModel(ctx([openai, session]), lang('gpt-4o-mini') as never)).toBe(openai)
+  })
+  it('an override that lost auth still resolves from the catalog (fails visibly later)', () => {
+    expect(resolveModel(ctx([session]), lang('openai/gpt-4o-mini') as never)).toBe(openai)
+  })
+  it('a bare id ambiguous among available models falls back to the session model', () => {
+    expect(resolveModel(ctx([openai, azure, session]), lang('gpt-4o-mini') as never)).toBe(session)
+  })
+  it('an unknown override falls back to the session model', () => {
+    expect(resolveModel(ctx([session]), lang('gpt-nonexistent') as never)).toBe(session)
+  })
+  it('no override uses the session model', () => {
+    expect(resolveModel(ctx([session]), lang(undefined) as never)).toBe(session)
+  })
+})
+
+describe('warnOnCacheMismatch', () => {
+  const session = { provider: 'openai', id: 'gpt-4o-mini' }
+  const other = { provider: 'zai', id: 'glm-5' }
+  const ctx = (notes: string[]) =>
+    ({
+      model: session,
+      modelRegistry: { getAll: () => [session, other] },
+      ui: {
+        notify: (msg: string) => {
+          notes.push(msg)
+        }
+      }
+    }) as never
+
+  it('does not warn when a hand-edited ref resolves to the session model', () => {
+    const notes: string[] = []
+    warnOnCacheMismatch(ctx(notes), lang('GPT-4O-MINI', true) as never)
+    expect(notes).toEqual([])
+  })
+  it('warns when the override resolves to a different model', () => {
+    const notes: string[] = []
+    warnOnCacheMismatch(ctx(notes), lang('glm-5', true) as never)
+    expect(notes).toHaveLength(1)
+    expect(notes[0]).toContain('zai/glm-5')
+  })
+  it('stays quiet while context mode is off', () => {
+    const notes: string[] = []
+    warnOnCacheMismatch(ctx(notes), lang('glm-5', false) as never)
+    expect(notes).toEqual([])
   })
 })

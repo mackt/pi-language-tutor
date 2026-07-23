@@ -66,17 +66,17 @@ That is enough to start.
 
 Type `/lang` in the TUI to open the interactive settings menu, or set things directly with the commands below.
 
-| Command                     | What it does                                                                                                             |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `/translate` or `alt+t`     | Translate the last assistant response (bilingual card)                                                                   |
-| `/lang`                     | Open the interactive settings menu — every option with an inline description                                             |
-| `/lang on` \| `off`         | Resume / pause the writing check                                                                                         |
-| `/lang auto on` \| `off`    | Auto-translate every final response                                                                                      |
-| `/lang native <code>`       | Set your native language — translation target and explanation language (`zh-CN`, `ja`, …)                                |
-| `/lang learning <code>`     | Set the language you are practicing (`en`, `fr`, …)                                                                      |
-| `/lang model <model>`       | Use a cheaper model for checks and translations — `provider/id`, or just the model id when it is unique across providers |
-| `/lang model default`       | Go back to the session model                                                                                             |
-| `/lang context on` \| `off` | Give translations the full session context (off by default; see below)                                                   |
+| Command                     | What it does                                                                                                                                             |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/translate` or `alt+t`     | Translate the last assistant response (bilingual card)                                                                                                   |
+| `/lang`                     | Open the interactive settings menu — every option with an inline description                                                                             |
+| `/lang on` \| `off`         | Resume / pause the writing check                                                                                                                         |
+| `/lang auto on` \| `off`    | Auto-translate every final response                                                                                                                      |
+| `/lang native <code>`       | Set your native language — translation target and explanation language (`zh-CN`, `ja`, …)                                                                |
+| `/lang learning <code>`     | Set the language you are practicing (`en`, `fr`, …)                                                                                                      |
+| `/lang model <model>`       | Use a cheaper model for checks and translations — `provider/id`, or just the model id when it is unique among the providers you have configured auth for |
+| `/lang model default`       | Go back to the session model                                                                                                                             |
+| `/lang context on` \| `off` | Give translations the full session context (off by default; see below)                                                                                   |
 
 ## Configuration
 

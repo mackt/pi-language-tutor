@@ -93,12 +93,17 @@ async function completeWithModel(
 export function resolveModel(ctx: ExtensionContext, cfg: Config): ResolvedModel | undefined {
   if (cfg.model && cfg.model !== 'default') {
     // /lang model saves canonical provider/id, but a hand-edited config may
-    // hold a bare id; match both the way pi's own resolver does. Restricting
-    // to configured-auth models keeps a bare id unambiguous when other
-    // providers' catalogs also list it, and an unauthenticated override
-    // could not complete anyway.
-    const match = matchModelReference(cfg.model, ctx.modelRegistry.getAvailable())
-    if (match.kind === 'found') return match.model
+    // hold a bare id; match both the way pi's own resolver does. Matching
+    // configured-auth models first keeps a bare id unambiguous when other
+    // providers' catalogs also list it.
+    const available = matchModelReference(cfg.model, ctx.modelRegistry.getAvailable())
+    if (available.kind === 'found') return available.model
+    // An override that exists in the catalog but lost its auth (/logout, env
+    // var removed) must fail the side-call visibly in runLlm — not silently
+    // re-route translations, and the conversation data, to the session
+    // model's provider.
+    const catalog = matchModelReference(cfg.model, ctx.modelRegistry.getAll())
+    if (catalog.kind === 'found') return catalog.model
   }
   return ctx.model
 }
