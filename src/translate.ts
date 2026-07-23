@@ -142,9 +142,14 @@ export function registerTranslation(pi: ExtensionAPI, deps: TranslateDeps): void
 				if (!fork || ctx.signal?.aborted) throw err;
 			}
 			if (!done && fork && !ctx.signal?.aborted) done = await attempt(undefined);
-			if (!done) notify(`Translation failed (no API key for ${model.provider}/${model.id}?)`);
-		} catch {
-			notify("Translation failed");
+			if (!done) {
+				notify(
+					`Translation failed for ${model.provider}/${model.id} (missing API key, empty response, or unsupported side-call). Try /lang model <provider/id>.`,
+				);
+			}
+		} catch (err) {
+			const detail = err instanceof Error && err.message ? `: ${err.message}` : "";
+			notify(`Translation failed${detail}`);
 		} finally {
 			updateStatus(ctx, cfg);
 		}
