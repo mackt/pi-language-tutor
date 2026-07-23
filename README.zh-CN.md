@@ -4,7 +4,7 @@
 
 一边 coding 一边学外语。这是一个 [pi](https://pi.dev) 扩展：它会检查你 prompt 里的拼写和语法，用母语给你讲解错在哪，还能把 agent 的回复渲染成沉浸式翻译那样的双语对照。
 
-<img src="docs/writing-check.png" width="720" alt="Writing check 面板：agent 照常处理 prompt 的同时，每个错误都给出改法、中文解释，以及整句更地道的说法。">
+<img src="https://raw.githubusercontent.com/mackt/pi-language-tutor/main/docs/writing-check.png" width="720" alt="Writing check 面板：agent 照常处理 prompt 的同时，每个错误都给出改法、中文解释，以及整句更地道的说法。">
 
 ## 安装
 
@@ -44,7 +44,7 @@ ln -s "$(pwd)/pi-language-tutor" ~/.pi/agent/extensions/pi-language-tutor
 
 2. agent 回答完，按 `alt+t`（macOS 上是 ⌥T，需要在终端里[把 Option 设为 Meta 键](https://iterm2.com/documentation-preferences-profiles-keys.html)；也可以直接运行 `/translate`）。回复会重新渲染成双语卡片，每个原文段落下面紧跟译文。
 
-   <img src="docs/bilingual-card.png" width="720" alt="双语卡片：agent 回复的每个段落下面紧跟译文，沉浸式翻译风格，代码块原样保留。">
+   <img src="https://raw.githubusercontent.com/mackt/pi-language-tutor/main/docs/bilingual-card.png" width="720" alt="双语卡片：agent 回复的每个段落下面紧跟译文，沉浸式翻译风格，代码块原样保留。">
 
 3. 觉得双语对照好用，可以让每条回复自动翻译：
 

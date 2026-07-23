@@ -5,6 +5,10 @@
 	"type": "module",
 	"license": "MIT",
 	"main": "language-learn.ts",
+	"files": [
+		"language-learn.ts",
+		"src"
+	],
 	"pi": {
 		"extensions": [
 			"./language-learn.ts"
