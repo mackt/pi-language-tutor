@@ -1,0 +1,33 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["import", "typescript", "unicorn", "vitest"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn",
+    "perf": "warn"
+  },
+  "rules": {
+    "no-unused-vars": "warn",
+    "no-console": "off",
+    "eqeqeq": "warn",
+    "no-case-declarations": "warn",
+
+    "import/no-cycle": "warn",
+    "import/no-self-import": "error",
+    "import/no-duplicates": "warn",
+    "import/default": "off",
+
+    "typescript/no-explicit-any": "off",
+    "typescript/no-non-null-assertion": "off"
+  },
+  "settings": {
+    "vitest": {
+      "typecheck": false
+    }
+  },
+  "env": {
+    "node": true,
+    "builtin": true
+  },
+  "globals": {}
+}
