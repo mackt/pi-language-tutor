@@ -99,7 +99,7 @@ ln -s "$(pwd)/pi-language-tutor" ~/.pi/agent/extensions/pi-language-tutor
 
 **双语卡片。** 段落按「原文在上、译文在下」排列，和沉浸式翻译一个风格。短代码块（≤5 行）原样保留，更长的用 `[code block ↑ N lines]` 占位——完整代码就在上方的原文里。自动模式下，中间的工具调用叙述和少于 15 个词的回复不会翻译；开启时底部状态栏会显示 `🌐 auto`。
 
-**自定义 provider。** 在 pi 0.81+ 上，写作检查和翻译会优先走 provider 注册的 `streamSimple`（例如 Cursor 的 `cursor-sdk`）；内置 api id 仍走 pi-ai 的 `completeSimple`。pi 0.80 则仍通过全局 api registry 覆盖自定义 provider。
+**自定义 provider。** 在 pi 0.81+ 上，写作检查和翻译直接走组合 provider 的 `streamSimple`——与主会话完全相同的分发路径——因此无论 provider 是以配置形式注册（如 Cursor 的 `cursor-sdk`）还是以原生 `Provider` 对象注册，都能正常工作。pi 0.80 上则回落到 pi-ai 的 `completeSimple`，那里的全局 api registry 本就覆盖自定义 provider。
 
 **上下文模式**（`/lang context on`，默认关闭）。默认情况下翻译只能看到被翻译的那条消息，代词指代、项目名、会话里约定的术语都可能译得很泛。上下文模式改为从主会话「fork」出翻译请求：完整复用主会话上一次 LLM 请求的前缀（相同的工具定义、系统提示词和消息历史），这样整段历史都能命中服务商的 prompt cache，你只需付缓存读取的价格（Anthropic 约为正常输入价的 10%）加上翻译本身的开销。两点注意：
 

@@ -38,36 +38,76 @@ export interface ForkContext {
   reasoning: SimpleStreamOptions['reasoning']
 }
 
-/** Narrow registry surface used by {@link getProviderStreamSimple} (testable). */
-export type StreamSimpleRegistry = {
+/** Narrow registry surface used by {@link getProviderStream} (testable). */
+export type ProviderRegistry = {
+  getProvider(provider: string): { streamSimple?: StreamSimpleFn } | undefined
+}
+
+/** Legacy 0.80 registry surface for config-registered custom providers. */
+export type RegisteredProviderConfigRegistry = {
   getRegisteredProviderConfig(
     provider: string
   ): { api?: string; streamSimple?: StreamSimpleFn } | undefined
 }
 
+/** Current registry surface for request-scoped provider auth. */
+export type ProviderAuthRegistry = {
+  getProviderAuth(provider: string): Promise<{ auth: { baseUrl?: string } } | undefined>
+}
+
+type SideCallRegistry = Partial<ProviderRegistry> &
+  Partial<RegisteredProviderConfigRegistry> &
+  Partial<ProviderAuthRegistry>
+
 /**
- * Prefer a provider-registered `streamSimple` over the global `completeSimple`
- * registry. Custom providers (e.g. `cursor-sdk`) register their handler on the
- * provider config; `completeSimple` only knows built-in api ids and throws
- * `No API provider registered for api: …` for those models.
+ * Resolve the composed provider's `streamSimple` for a model. The composed
+ * provider dispatches the same way the main session does — extension handler
+ * when the model's api matches, else the base provider, else the global api
+ * registry — and covers custom providers registered either as a config
+ * (`registerProvider(name, config)`, e.g. `cursor-sdk`) or as a native
+ * `Provider` object, which `getRegisteredProviderConfig` cannot see.
  */
-export function getProviderStreamSimple(
-  modelRegistry: StreamSimpleRegistry,
+export function getProviderStream(
+  registry: ProviderRegistry,
+  model: Pick<ResolvedModel, 'provider'>
+): StreamSimpleFn | undefined {
+  const provider = registry.getProvider(model.provider)
+  if (typeof provider?.streamSimple !== 'function') return undefined
+  return (m, context, options) => provider.streamSimple!(m, context, options)
+}
+
+/** Resolve a legacy config-registered provider stream when it owns the model's api. */
+export function getRegisteredProviderStream(
+  registry: RegisteredProviderConfigRegistry,
   model: Pick<ResolvedModel, 'provider' | 'api'>
 ): StreamSimpleFn | undefined {
-  const config = modelRegistry.getRegisteredProviderConfig(model.provider)
-  if (!config?.streamSimple) return undefined
-  // Only use the custom handler when it owns this model's api id.
+  const config = registry.getRegisteredProviderConfig(model.provider)
+  if (typeof config?.streamSimple !== 'function') return undefined
   if (config.api !== undefined && config.api !== model.api) return undefined
-  return config.streamSimple
+  return (m, context, options) => config.streamSimple!(m, context, options)
 }
 
 /**
- * pi 0.80 registered extension `streamSimple` into the global api registry, so
- * `completeSimple` worked for custom apis. pi 0.81 moved that handler onto the
- * provider config (`getRegisteredProviderConfig`) and stopped calling
- * `registerApiProvider`, which breaks side-calls for apis like `cursor-sdk`.
- * Prefer the provider handler when the method exists; otherwise fall back.
+ * If provider auth resolves a request-scoped baseUrl, copy it onto the model
+ * before dispatching directly to provider.streamSimple. This mirrors the
+ * runtime request-preparation step that side-calls bypass on pi 0.81+.
+ */
+export async function withProviderAuthBaseUrl<
+  T extends Pick<ResolvedModel, 'provider'> & { baseUrl?: string }
+>(registry: Partial<ProviderAuthRegistry>, model: T): Promise<T> {
+  if (typeof registry.getProviderAuth !== 'function') return model
+  const auth = await registry.getProviderAuth(model.provider)
+  const baseUrl = auth?.auth.baseUrl
+  return baseUrl ? { ...model, baseUrl } : model
+}
+
+/**
+ * pi 0.80 originally registered extension `streamSimple` handlers into the
+ * global api registry, so `completeSimple` worked for custom apis. Later 0.80
+ * builds exposed config-registered handlers through `getRegisteredProviderConfig`,
+ * and pi 0.81 moved dispatch onto the composed provider (`getProvider`). Try
+ * the composed provider first, keep the config fallback for 0.80.8–0.80.10,
+ * then fall back to `completeSimple` for built-ins and older runtimes.
  */
 async function completeWithModel(
   ctx: ExtensionContext,
@@ -75,18 +115,30 @@ async function completeWithModel(
   context: Context,
   options: SimpleStreamOptions
 ): Promise<AssistantMessage> {
-  const registry = ctx.modelRegistry as ExtensionContext['modelRegistry'] &
-    Partial<StreamSimpleRegistry>
-  if (typeof registry.getRegisteredProviderConfig === 'function') {
-    const providerStream = getProviderStreamSimple(
-      { getRegisteredProviderConfig: (id) => registry.getRegisteredProviderConfig!(id) },
-      model
+  const registry = ctx.modelRegistry as ExtensionContext['modelRegistry'] & SideCallRegistry
+  const requestModel = await withProviderAuthBaseUrl(registry, model)
+
+  if (typeof registry.getProvider === 'function') {
+    const providerStream = getProviderStream(
+      { getProvider: (id) => registry.getProvider!(id) },
+      requestModel
     )
     if (providerStream) {
-      return providerStream(model, context, options).result()
+      return providerStream(requestModel, context, options).result()
     }
   }
-  return completeSimple(model, context, options)
+
+  if (typeof registry.getRegisteredProviderConfig === 'function') {
+    const providerStream = getRegisteredProviderStream(
+      { getRegisteredProviderConfig: (id) => registry.getRegisteredProviderConfig!(id) },
+      requestModel
+    )
+    if (providerStream) {
+      return providerStream(requestModel, context, options).result()
+    }
+  }
+
+  return completeSimple(requestModel, context, options)
 }
 
 /** The model to use for checks and translations: the configured override, else the session model. */
@@ -116,7 +168,7 @@ export async function runLlm(
   fork?: ForkContext
 ): Promise<string | undefined> {
   const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model)
-  if (!auth.ok || !auth.apiKey) return undefined
+  if (!auth.ok) return undefined
 
   const user: Message = {
     role: 'user',

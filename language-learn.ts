@@ -13,5 +13,4 @@
  */
 
 export * from './src/core.ts'
-export { getProviderStreamSimple } from './src/llm.ts'
 export { default } from './src/index.ts'
