@@ -7,6 +7,7 @@ import {
   buildSegmentPrompt,
   buildWholeTranslatePrompt,
   CONTEXT_PREFACE,
+  matchModelReference,
   getProviderStreamSimple
 } from '../language-learn.ts'
 import type { StreamSimpleRegistry } from '../src/llm.ts'
@@ -220,5 +221,54 @@ describe('getProviderStreamSimple (custom providers, e.g. cursor-sdk)', () => {
     expect(
       getProviderStreamSimple(registry(undefined), { provider: 'cursor', api: 'cursor-sdk' })
     ).toBeUndefined()
+  })
+})
+
+describe('matchModelReference', () => {
+  const models = [
+    { provider: 'openai', id: 'gpt-4o-mini' },
+    { provider: 'azure', id: 'gpt-4o-mini' },
+    { provider: 'anthropic', id: 'claude-sonnet-5' },
+    { provider: 'openrouter', id: 'openai/gpt-4o-mini' }
+  ]
+
+  it('canonical provider/id wins over a same-named bare id elsewhere', () => {
+    expect(matchModelReference('openai/gpt-4o-mini', models)).toEqual({
+      kind: 'found',
+      model: { provider: 'openai', id: 'gpt-4o-mini' }
+    })
+  })
+  it('resolves a model id that itself contains a slash', () => {
+    expect(matchModelReference('openrouter/openai/gpt-4o-mini', models)).toEqual({
+      kind: 'found',
+      model: { provider: 'openrouter', id: 'openai/gpt-4o-mini' }
+    })
+  })
+  it('resolves a unique bare id', () => {
+    expect(matchModelReference('claude-sonnet-5', models)).toEqual({
+      kind: 'found',
+      model: { provider: 'anthropic', id: 'claude-sonnet-5' }
+    })
+  })
+  it('reports an ambiguous bare id with its candidates', () => {
+    expect(matchModelReference('gpt-4o-mini', models)).toEqual({
+      kind: 'ambiguous',
+      candidates: [
+        { provider: 'openai', id: 'gpt-4o-mini' },
+        { provider: 'azure', id: 'gpt-4o-mini' }
+      ]
+    })
+  })
+  it('matches case-insensitively', () => {
+    expect(matchModelReference('Anthropic/Claude-Sonnet-5', models).kind).toBe('found')
+  })
+  it('tolerates spaces around the slash', () => {
+    expect(matchModelReference('anthropic / claude-sonnet-5', models).kind).toBe('found')
+  })
+  it('unknown reference', () => {
+    expect(matchModelReference('gpt-nonexistent', models)).toEqual({ kind: 'none' })
+  })
+  it('empty reference', () => {
+    expect(matchModelReference('  ', models)).toEqual({ kind: 'none' })
   })
 })

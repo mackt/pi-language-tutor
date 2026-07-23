@@ -16,6 +16,7 @@ import {
   Text
 } from '@earendil-works/pi-tui'
 import { loadConfig, saveConfig } from './config.ts'
+import { matchModelReference } from './core.ts'
 import type { Config } from './core.ts'
 
 export const STATUS_KEY = 'language-learn'
@@ -41,7 +42,7 @@ export function warnOnCacheMismatch(ctx: ExtensionContext, cfg: Config): void {
 }
 
 const LANG_USAGE =
-  'Usage: /lang  (settings menu)  |  /lang on|off  |  /lang auto|context on|off  |  /lang native|learning <code>  |  /lang model <provider/id|default>'
+  'Usage: /lang  (settings menu)  |  /lang on|off  |  /lang auto|context on|off  |  /lang native|learning <code>  |  /lang model <provider/id|id|default>'
 
 const LANGUAGE_PRESETS: ReadonlyArray<{ code: string; name: string }> = [
   { code: 'en', name: 'English' },
@@ -333,21 +334,29 @@ export function registerLangSettings(pi: ExtensionAPI, deps: SettingsDeps): void
           break
         case 'model':
           if (!value) {
-            ctx.ui.notify('Usage: /lang model <provider/id> or /lang model default', 'warning')
+            ctx.ui.notify(
+              'Usage: /lang model <provider/id>, a unique model id, or default',
+              'warning'
+            )
             return
           }
           if (value === 'default') {
             cfg.model = undefined
           } else {
-            const slash = value.indexOf('/')
-            const found =
-              slash > 0
-                ? ctx.modelRegistry.find(value.slice(0, slash), value.slice(slash + 1))
-                : undefined
-            if (!found) {
-              ctx.ui.notify(`Model not found: ${value} (expected <provider>/<id>)`, 'warning')
+            const match = matchModelReference(value, ctx.modelRegistry.getAll())
+            if (match.kind === 'ambiguous') {
+              const refs = match.candidates.map((m) => `${m.provider}/${m.id}`).join(', ')
+              ctx.ui.notify(`Ambiguous model id: ${value} — use one of: ${refs}`, 'warning')
               return
             }
+            if (match.kind === 'none') {
+              ctx.ui.notify(
+                `Model not found: ${value} (expected <provider>/<id> or a unique model id)`,
+                'warning'
+              )
+              return
+            }
+            const found = match.model
             const hasAuth = ctx.modelRegistry
               .getAvailable()
               .some((m) => m.provider === found.provider && m.id === found.id)
@@ -358,7 +367,7 @@ export function registerLangSettings(pi: ExtensionAPI, deps: SettingsDeps): void
               )
               return
             }
-            cfg.model = value
+            cfg.model = `${found.provider}/${found.id}`
             warnOnCacheMismatch(ctx, cfg)
           }
           saveConfig(cfg)

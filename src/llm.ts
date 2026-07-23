@@ -15,6 +15,7 @@ import type {
 } from '@earendil-works/pi-ai/compat'
 import { convertToLlm } from '@earendil-works/pi-coding-agent'
 import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-agent'
+import { matchModelReference } from './core.ts'
 import type { Config } from './core.ts'
 
 export type ResolvedModel = NonNullable<ExtensionContext['model']>
@@ -91,11 +92,10 @@ async function completeWithModel(
 /** The model to use for checks and translations: the configured override, else the session model. */
 export function resolveModel(ctx: ExtensionContext, cfg: Config): ResolvedModel | undefined {
   if (cfg.model && cfg.model !== 'default') {
-    const slash = cfg.model.indexOf('/')
-    if (slash > 0) {
-      const found = ctx.modelRegistry.find(cfg.model.slice(0, slash), cfg.model.slice(slash + 1))
-      if (found) return found
-    }
+    // /lang model saves canonical provider/id, but a hand-edited config may
+    // hold a bare id; match both the way pi's own resolver does.
+    const match = matchModelReference(cfg.model, ctx.modelRegistry.getAll())
+    if (match.kind === 'found') return match.model
   }
   return ctx.model
 }

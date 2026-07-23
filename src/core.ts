@@ -218,3 +218,52 @@ export function cardMarkdown(segments: CardSegment[]): string {
     })
     .join('\n\n')
 }
+
+/** The subset of a registry model a reference can be matched against. */
+export interface ModelRefLike {
+  provider: string
+  id: string
+}
+
+export type ModelMatch<M extends ModelRefLike> =
+  | { kind: 'found'; model: M }
+  | { kind: 'ambiguous'; candidates: M[] }
+  | { kind: 'none' }
+
+function decide<M extends ModelRefLike>(matches: M[]): ModelMatch<M> | undefined {
+  if (matches.length === 1) return { kind: 'found', model: matches[0] }
+  if (matches.length > 1) return { kind: 'ambiguous', candidates: matches }
+  return undefined
+}
+
+/**
+ * Match a user-supplied model reference the way pi's own resolver does
+ * (`core/model-resolver.ts`, not re-exported by the package): canonical
+ * `provider/id` match first — which also handles model ids that themselves
+ * contain slashes — then a first-slash split, then a bare model id. All
+ * comparisons are case-insensitive. A bare id shared by several providers is
+ * reported as ambiguous with the candidates, so callers can list them.
+ */
+export function matchModelReference<M extends ModelRefLike>(
+  reference: string,
+  models: readonly M[]
+): ModelMatch<M> {
+  const ref = reference.trim().toLowerCase()
+  if (!ref) return { kind: 'none' }
+
+  const canonical = decide(models.filter((m) => `${m.provider}/${m.id}`.toLowerCase() === ref))
+  if (canonical) return canonical
+
+  const slash = ref.indexOf('/')
+  if (slash > 0 && slash < ref.length - 1) {
+    // Trimmed separately so "provider / id" with stray spaces still resolves.
+    const provider = ref.slice(0, slash).trim()
+    const id = ref.slice(slash + 1).trim()
+    const split = decide(
+      models.filter((m) => m.provider.toLowerCase() === provider && m.id.toLowerCase() === id)
+    )
+    if (split) return split
+  }
+
+  return decide(models.filter((m) => m.id.toLowerCase() === ref)) ?? { kind: 'none' }
+}
