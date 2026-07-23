@@ -12,7 +12,7 @@
 pi install npm:pi-language-tutor
 ```
 
-默认配置开箱即用：学英语、母语简体中文。母语是其他语言的话，一条命令切换：`/lang native ja`。
+默认配置开箱即用：学英语、母语简体中文。母语是其他语言的话，输入 `/lang` 在设置菜单里选，或者一条命令切换：`/lang native ja`。
 
 <details>
 <summary>备选：从 git 安装，或本地开发</summary>
@@ -76,7 +76,7 @@ ln -s "$(pwd)/pi-language-tutor" ~/.pi/agent/extensions/pi-language-tutor
 
 ## 配置
 
-配置保存在 `~/.pi/agent/language-learn.json`。所有选项都可以用 `/lang` 命令修改，基本不用手动编辑这个文件。
+配置保存在 `~/.pi/agent/language-learn.json`。输入 `/lang` 打开交互式设置菜单（方向键移动，Enter 切换开关或进入子菜单，每个选项都有说明），也可以用上表的命令直接设置，基本不用手动编辑这个文件。
 
 ```json
 {

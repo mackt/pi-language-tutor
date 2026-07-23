@@ -14,7 +14,7 @@ Learn a foreign language while you code. A [pi](https://pi.dev) extension that r
 pi install npm:pi-language-tutor
 ```
 
-That is the only required step. The defaults (learning English, native Simplified Chinese) work out of the box. Speak another language? One command: `/lang native ja`.
+That is the only required step. The defaults (learning English, native Simplified Chinese) work out of the box. Speak another language? Type `/lang` and pick it from the settings menu — or one command: `/lang native ja`.
 
 <details>
 <summary>Alternative: install from git, or hack on a local clone</summary>
@@ -78,7 +78,7 @@ That is enough to start.
 
 ## Configuration
 
-Settings persist in `~/.pi/agent/language-learn.json`; the `/lang` command manages everything, so you rarely edit it by hand.
+Settings persist in `~/.pi/agent/language-learn.json`. Type `/lang` for an interactive settings menu (arrow keys, Enter to toggle or open a submenu, every option explained inline), or use the direct commands from the table above — you rarely edit the file by hand.
 
 ```json
 {
