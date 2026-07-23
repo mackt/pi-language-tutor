@@ -9,5 +9,5 @@
 		"skipLibCheck": true,
 		"types": ["node"]
 	},
-	"include": ["language-learn.ts", "src"]
+	"include": ["language-learn.ts", "src", "test"]
 }
