@@ -343,30 +343,38 @@ export function registerLangSettings(pi: ExtensionAPI, deps: SettingsDeps): void
           if (value === 'default') {
             cfg.model = undefined
           } else {
-            const match = matchModelReference(value, ctx.modelRegistry.getAll())
+            // Resolve against configured-auth models, like pi's own /model:
+            // a bare id shadowed by unconfigured providers' catalogs stays
+            // unambiguous. The full catalog is only consulted for the error
+            // message, to tell "needs /login" apart from "does not exist".
+            const match = matchModelReference(value, ctx.modelRegistry.getAvailable())
             if (match.kind === 'ambiguous') {
               const refs = match.candidates.map((m) => `${m.provider}/${m.id}`).join(', ')
               ctx.ui.notify(`Ambiguous model id: ${value} — use one of: ${refs}`, 'warning')
               return
             }
             if (match.kind === 'none') {
-              ctx.ui.notify(
-                `Model not found: ${value} (expected <provider>/<id> or a unique model id)`,
-                'warning'
-              )
+              const inCatalog = matchModelReference(value, ctx.modelRegistry.getAll())
+              if (inCatalog.kind === 'found') {
+                ctx.ui.notify(
+                  `No auth configured for ${inCatalog.model.provider}/${inCatalog.model.id} — run /login ${inCatalog.model.provider} first`,
+                  'warning'
+                )
+              } else if (inCatalog.kind === 'ambiguous') {
+                const refs = inCatalog.candidates.map((m) => `${m.provider}/${m.id}`).join(', ')
+                ctx.ui.notify(
+                  `No auth configured for any provider of ${value} (${refs}) — run /login first`,
+                  'warning'
+                )
+              } else {
+                ctx.ui.notify(
+                  `Model not found: ${value} (expected <provider>/<id> or a unique model id)`,
+                  'warning'
+                )
+              }
               return
             }
             const found = match.model
-            const hasAuth = ctx.modelRegistry
-              .getAvailable()
-              .some((m) => m.provider === found.provider && m.id === found.id)
-            if (!hasAuth) {
-              ctx.ui.notify(
-                `No auth configured for ${value} — run /login ${found.provider} first`,
-                'warning'
-              )
-              return
-            }
             cfg.model = `${found.provider}/${found.id}`
             warnOnCacheMismatch(ctx, cfg)
           }

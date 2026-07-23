@@ -93,8 +93,11 @@ async function completeWithModel(
 export function resolveModel(ctx: ExtensionContext, cfg: Config): ResolvedModel | undefined {
   if (cfg.model && cfg.model !== 'default') {
     // /lang model saves canonical provider/id, but a hand-edited config may
-    // hold a bare id; match both the way pi's own resolver does.
-    const match = matchModelReference(cfg.model, ctx.modelRegistry.getAll())
+    // hold a bare id; match both the way pi's own resolver does. Restricting
+    // to configured-auth models keeps a bare id unambiguous when other
+    // providers' catalogs also list it, and an unauthenticated override
+    // could not complete anyway.
+    const match = matchModelReference(cfg.model, ctx.modelRegistry.getAvailable())
     if (match.kind === 'found') return match.model
   }
   return ctx.model
