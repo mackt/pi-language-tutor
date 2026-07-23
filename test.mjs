@@ -82,7 +82,14 @@ expect("card pair as blockquote", card.includes("Hello world.\n\n> 你好世界�
 expect("card keeps short code", card.includes("```ts\nx()\n```"), true);
 expect("card code placeholder", card.includes("*[code block ↑ 23 lines]*"), true);
 
-const sp = buildSegmentPrompt(["a", "b"], { learning: "en", native: "zh-CN", enabled: true, auto: false });
+const cfg = { learning: "en", native: "zh-CN", enabled: true, auto: false, context: false };
+const sp = buildSegmentPrompt(["a", "b"], cfg);
 expect("segment prompt numbering", sp.includes("[0]\na") && sp.includes("[1]\nb") && sp.includes("exactly 2 strings"), true);
+expect("segment prompt has no context preface by default", sp.includes(ext.CONTEXT_PREFACE), false);
+expect("contextual segment prompt starts with preface", buildSegmentPrompt(["a"], cfg, true).startsWith(ext.CONTEXT_PREFACE), true);
+
+const wp = ext.buildWholeTranslatePrompt("some text", cfg);
+expect("whole prompt wraps source", wp.includes("<<<\nsome text\n>>>"), true);
+expect("contextual whole prompt starts with preface", ext.buildWholeTranslatePrompt("x", cfg, true).startsWith(ext.CONTEXT_PREFACE), true);
 
 process.exit(failures ? 1 : 0);

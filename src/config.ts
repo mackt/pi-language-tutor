@@ -9,7 +9,7 @@ import type { Config } from "./core.ts";
 
 const CONFIG_PATH = path.join(os.homedir(), ".pi", "agent", "language-learn.json");
 
-export const DEFAULT_CONFIG: Config = { learning: "en", native: "zh-CN", enabled: true, auto: false };
+export const DEFAULT_CONFIG: Config = { learning: "en", native: "zh-CN", enabled: true, auto: false, context: false };
 
 export function loadConfig(): Config {
 	try {
@@ -20,6 +20,7 @@ export function loadConfig(): Config {
 			model: typeof raw.model === "string" ? raw.model : undefined,
 			enabled: raw.enabled !== false,
 			auto: raw.auto === true,
+			context: raw.context === true,
 		};
 	} catch {
 		return { ...DEFAULT_CONFIG };

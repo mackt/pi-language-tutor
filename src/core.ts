@@ -10,6 +10,8 @@ export interface Config {
 	model?: string;
 	enabled: boolean;
 	auto: boolean;
+	/** Fork the main session's context into translation calls (default off: costs cache reads). */
+	context: boolean;
 }
 
 export interface GrammarItem {
@@ -166,9 +168,13 @@ export function segmentMarkdown(src: string): Segment[] {
 	return segments;
 }
 
-export function buildSegmentPrompt(proseTexts: string[], cfg: Config): string {
+export const CONTEXT_PREFACE =
+	"The conversation above is the session this response came from — use it to resolve terminology, referents, and project-specific names.";
+
+export function buildSegmentPrompt(proseTexts: string[], cfg: Config, contextual = false): string {
 	const numbered = proseTexts.map((t, i) => `[${i}]\n${t}`).join("\n\n");
 	return [
+		...(contextual ? [CONTEXT_PREFACE] : []),
 		`Translate each numbered segment of an AI coding assistant's response into ${cfg.native}.`,
 		`Keep inline code, file paths, commands, and technical identifiers untranslated. Preserve markdown formatting within each segment.`,
 		``,
@@ -178,6 +184,20 @@ export function buildSegmentPrompt(proseTexts: string[], cfg: Config): string {
 		``,
 		`Segments:`,
 		numbered,
+	].join("\n");
+}
+
+/** Fallback prompt: whole-text translation when segment alignment fails. */
+export function buildWholeTranslatePrompt(source: string, cfg: Config, contextual = false): string {
+	return [
+		...(contextual ? [CONTEXT_PREFACE] : []),
+		`Translate the following AI coding assistant response into ${cfg.native}.`,
+		`Keep code blocks, inline code, file paths, commands, and technical identifiers exactly as-is (untranslated).`,
+		`Preserve the markdown structure. Output ONLY the translation.`,
+		``,
+		`<<<`,
+		source,
+		`>>>`,
 	].join("\n");
 }
 
