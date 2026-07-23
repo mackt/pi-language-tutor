@@ -386,11 +386,11 @@ describe('slash-containing refs follow pi CLI semantics (OpenRouter-style ids)',
   })
   it('a slash-containing reference matching no catalog provider still resolves as a bare id', () => {
     const orphan = { provider: 'openrouter', id: 'mistral/devstral' }
-    const registry = {
+    const orphanCtx = {
       modelRegistry: { getAvailable: () => [orphan, session], getAll: () => [orphan, session] },
       model: session
     } as never
-    expect(resolveModel(registry, lang('mistral/devstral') as never)).toBe(orphan)
+    expect(resolveModel(orphanCtx, lang('mistral/devstral') as never)).toBe(orphan)
   })
   it('a bare id that lost auth everywhere still resolves from the catalog (fails visibly later)', () => {
     expect(resolveModel(ctx([session]), lang('gpt-4o-mini') as never)).toBe(openai)

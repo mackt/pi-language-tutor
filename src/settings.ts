@@ -47,8 +47,49 @@ export function warnOnCacheMismatch(ctx: ExtensionContext, cfg: Config): void {
   )
 }
 
+/** Options for the model pickers: default (session model) + configured-auth models. */
+function modelOptions(ctx: ExtensionContext): SelectItem[] {
+  return [
+    { value: 'default', label: 'default', description: 'follow the session model' },
+    ...ctx.modelRegistry.getAvailable().map((m) => ({
+      value: `${m.provider}/${m.id}`,
+      label: `${m.provider}/${m.id}`,
+      description: m.name
+    }))
+  ]
+}
+
+/** Standalone model picker for bare `/lang model` — same list as the menu's submenu. */
+async function openModelPicker(ctx: ExtensionContext, cfg: Config): Promise<void> {
+  const selected = await ctx.ui.custom<string | undefined>((tui, theme, _kb, done) => {
+    const options = modelOptions(ctx)
+    const list = new SelectList(options, Math.min(options.length, 10), getSelectListTheme())
+    const preselect = options.findIndex((o) => o.value === (cfg.model ?? 'default'))
+    if (preselect >= 0) list.setSelectedIndex(preselect)
+    list.onSelect = (item) => done(item.value)
+    list.onCancel = () => done(undefined)
+    return {
+      render: (width: number) => [
+        theme.fg('accent', theme.bold(' Model')),
+        '',
+        ...list.render(width)
+      ],
+      invalidate: () => {},
+      handleInput: (data: string) => {
+        list.handleInput(data)
+        tui.requestRender()
+      }
+    }
+  })
+  if (selected === undefined) return
+  cfg.model = selected === 'default' ? undefined : selected
+  saveConfig(cfg)
+  if (cfg.model) warnOnCacheMismatch(ctx, cfg)
+  updateStatus(ctx, cfg)
+}
+
 const LANG_USAGE =
-  'Usage: /lang  (settings menu)  |  /lang on|off  |  /lang auto|context on|off  |  /lang native|learning <code>  |  /lang model <provider/id|id|default>'
+  'Usage: /lang  (settings menu)  |  /lang on|off  |  /lang auto|context on|off  |  /lang native|learning <code>  |  /lang model [provider/id|id|default]'
 
 const LANGUAGE_PRESETS: ReadonlyArray<{ code: string; name: string }> = [
   { code: 'en', name: 'English' },
@@ -171,14 +212,7 @@ export function registerLangSettings(pi: ExtensionAPI, deps: SettingsDeps): void
 
       /** Submenu: models with configured auth (same source as the built-in /model selector). */
       const modelSubmenu = (currentValue: string, submenuDone: (value?: string) => void) => {
-        const options: SelectItem[] = [
-          { value: 'default', label: 'default', description: 'follow the session model' },
-          ...ctx.modelRegistry.getAvailable().map((m) => ({
-            value: `${m.provider}/${m.id}`,
-            label: `${m.provider}/${m.id}`,
-            description: m.name
-          }))
-        ]
+        const options = modelOptions(ctx)
         const list = new SelectList(options, Math.min(options.length, 10), getSelectListTheme())
         const preselect = options.findIndex((o) => o.value === currentValue)
         if (preselect >= 0) list.setSelectedIndex(preselect)
@@ -340,10 +374,15 @@ export function registerLangSettings(pi: ExtensionAPI, deps: SettingsDeps): void
           break
         case 'model':
           if (!value) {
-            ctx.ui.notify(
-              'Usage: /lang model <provider/id>, a unique model id, or default',
-              'warning'
-            )
+            if (ctx.hasUI && ctx.mode === 'tui') {
+              await openModelPicker(ctx, cfg)
+              show()
+            } else {
+              ctx.ui.notify(
+                'Usage: /lang model <provider/id>, a unique model id, or default',
+                'warning'
+              )
+            }
             return
           }
           if (value === 'default') {
