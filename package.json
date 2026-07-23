@@ -1,46 +1,46 @@
 {
-	"name": "pi-language-tutor",
-	"version": "0.2.0",
-	"description": "Pi extension for learning a foreign language while coding: background writing feedback (spelling, grammar, natural phrasing) on your prompts and bilingual translation of assistant responses",
-	"type": "module",
-	"license": "MIT",
-	"main": "language-learn.ts",
-	"files": [
-		"language-learn.ts",
-		"src"
-	],
-	"pi": {
-		"extensions": [
-			"./language-learn.ts"
-		]
-	},
-	"image": "https://raw.githubusercontent.com/mackt/pi-language-tutor/main/docs/writing-check.png",
-	"scripts": {
-		"check": "tsc --noEmit",
-		"test": "vitest run",
-		"lint": "oxlint",
-		"lint:fix": "oxlint --fix",
-		"fmt": "oxfmt",
-		"fmt:check": "oxfmt --check"
-	},
-	"keywords": [
-		"pi",
-		"pi-package",
-		"pi-extension",
-		"language-learning"
-	],
-	"devDependencies": {
-		"@earendil-works/pi-ai": "^0.80.6",
-		"@earendil-works/pi-coding-agent": "^0.80.6",
-		"@earendil-works/pi-tui": "^0.80.6",
-		"@types/node": "^26.1.1",
-		"oxfmt": "0.42.0",
-		"oxlint": "1.63.0",
-		"typescript": "^5.7.0",
-		"vitest": "^4.1.10"
-	},
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/mackt/pi-language-tutor.git"
-	}
+  "name": "pi-language-tutor",
+  "version": "0.2.0",
+  "description": "Pi extension for learning a foreign language while coding: background writing feedback (spelling, grammar, natural phrasing) on your prompts and bilingual translation of assistant responses",
+  "type": "module",
+  "license": "MIT",
+  "main": "language-learn.ts",
+  "files": [
+    "language-learn.ts",
+    "src"
+  ],
+  "pi": {
+    "extensions": [
+      "./language-learn.ts"
+    ]
+  },
+  "image": "https://raw.githubusercontent.com/mackt/pi-language-tutor/main/docs/writing-check.png",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check"
+  },
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "language-learning"
+  ],
+  "devDependencies": {
+    "@earendil-works/pi-ai": "^0.80.6",
+    "@earendil-works/pi-coding-agent": "^0.80.6",
+    "@earendil-works/pi-tui": "^0.80.6",
+    "@types/node": "^26.1.1",
+    "oxfmt": "0.42.0",
+    "oxlint": "1.63.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.10"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mackt/pi-language-tutor.git"
+  }
 }

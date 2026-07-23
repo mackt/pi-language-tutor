@@ -12,6 +12,6 @@
  * and test imports stable.
  */
 
-export * from "./src/core.ts";
-export { getProviderStreamSimple } from "./src/llm.ts";
-export { default } from "./src/index.ts";
+export * from './src/core.ts'
+export { getProviderStreamSimple } from './src/llm.ts'
+export { default } from './src/index.ts'

@@ -1,13 +1,13 @@
 {
-	"compilerOptions": {
-		"target": "ES2022",
-		"module": "ESNext",
-		"moduleResolution": "bundler",
-		"strict": true,
-		"noEmit": true,
-		"allowImportingTsExtensions": true,
-		"skipLibCheck": true,
-		"types": ["node"]
-	},
-	"include": ["language-learn.ts", "src", "test"]
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["language-learn.ts", "src", "test"]
 }

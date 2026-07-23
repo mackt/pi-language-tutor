@@ -6,7 +6,7 @@ Learn a foreign language while you code. A [pi](https://pi.dev) extension that r
 
 <img src="https://raw.githubusercontent.com/mackt/pi-language-tutor/main/docs/writing-check.png" width="720" alt="The Writing check panel: while the agent works on the prompt, each mistake is shown with its fix, an explanation in your native language, and a more natural phrasing of the whole sentence.">
 
-*You prompt with mistakes, the agent works anyway — and the `✏ Writing check` panel explains each fix in your native language.*
+_You prompt with mistakes, the agent works anyway — and the `✏ Writing check` panel explains each fix in your native language._
 
 ## Install
 
@@ -66,17 +66,17 @@ That is enough to start.
 
 Type `/lang` in the TUI to open the interactive settings menu, or set things directly with the commands below.
 
-| Command | What it does |
-|---------|--------------|
-| `/translate` or `alt+t` | Translate the last assistant response (bilingual card) |
-| `/lang` | Open the interactive settings menu — every option with an inline description |
-| `/lang on` \| `off` | Resume / pause the writing check |
-| `/lang auto on` \| `off` | Auto-translate every final response |
-| `/lang native <code>` | Set your native language — translation target and explanation language (`zh-CN`, `ja`, …) |
-| `/lang learning <code>` | Set the language you are practicing (`en`, `fr`, …) |
-| `/lang model <provider/id>` | Use a cheaper model for checks and translations |
-| `/lang model default` | Go back to the session model |
-| `/lang context on` \| `off` | Give translations the full session context (off by default; see below) |
+| Command                     | What it does                                                                              |
+| --------------------------- | ----------------------------------------------------------------------------------------- |
+| `/translate` or `alt+t`     | Translate the last assistant response (bilingual card)                                    |
+| `/lang`                     | Open the interactive settings menu — every option with an inline description              |
+| `/lang on` \| `off`         | Resume / pause the writing check                                                          |
+| `/lang auto on` \| `off`    | Auto-translate every final response                                                       |
+| `/lang native <code>`       | Set your native language — translation target and explanation language (`zh-CN`, `ja`, …) |
+| `/lang learning <code>`     | Set the language you are practicing (`en`, `fr`, …)                                       |
+| `/lang model <provider/id>` | Use a cheaper model for checks and translations                                           |
+| `/lang model default`       | Go back to the session model                                                              |
+| `/lang context on` \| `off` | Give translations the full session context (off by default; see below)                    |
 
 ## Configuration
 
@@ -84,12 +84,12 @@ Settings persist in `~/.pi/agent/language-learn.json`.
 
 ```json
 {
-	"learning": "en",
-	"native": "zh-CN",
-	"model": "openai/gpt-4o-mini",
-	"enabled": true,
-	"auto": false,
-	"context": false
+  "learning": "en",
+  "native": "zh-CN",
+  "model": "openai/gpt-4o-mini",
+  "enabled": true,
+  "auto": false,
+  "context": false
 }
 ```
 
