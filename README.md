@@ -103,7 +103,7 @@ Settings persist in `~/.pi/agent/language-learn.json`.
 
 **Context mode** (`/lang context on`, off by default). By default translations see only the message being translated, so pronouns, project names, and coined terms can come out generic. Context mode forks the session instead: the translation request replays the exact prefix of the main session's last LLM request (same tools, system prompt, and message history), so the provider serves the whole history from its prompt cache and you pay cache-read prices (~10% of input on Anthropic) plus the translation itself. Two things to know:
 
-- It only pays off when translations use the **session model** — a `/lang model` override can't hit the session's cache, and the whole history would be re-billed at full input price on every translation. The extension warns about this combination at startup and when you switch; `/lang model default` fixes it.
+- It only pays off when translations use the **session model** — a `/lang model` override can't hit the session's cache, and the whole history would be re-billed at full input price on every translation. It also changes where your data goes: with an override, the entire conversation is sent to the override model's provider, not just the text being translated. The extension warns about this combination at startup and when you switch; `/lang model default` fixes it.
 - Before the first agent turn of a session there is no captured request yet, so translations quietly fall back to context-free.
 
 ## Development

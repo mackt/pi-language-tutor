@@ -116,20 +116,33 @@ export function registerTranslation(pi: ExtensionAPI, deps: TranslateDeps): void
 		ctx.ui.setStatus(STATUS_KEY, "🌐 translating…");
 		try {
 			const clipped = source.slice(0, MAX_TRANSLATE_CHARS);
-			const fork = cfg.context ? deps.makeFork(ctx) : undefined;
-			const segments = await buildBilingualSegments(clipped, cfg, ctx, model, fork);
-			if (segments) {
-				pi.appendEntry<TranslationCard>(ENTRY_TYPE, { native: cfg.native, segments });
-				return;
-			}
 
-			// Fallback: whole-text translation as a plain card.
-			const translated = await runLlm(ctx, model, buildWholeTranslatePrompt(clipped, cfg, !!fork), ctx.signal, fork);
-			if (translated) {
+			const attempt = async (fork?: ForkContext): Promise<boolean> => {
+				const segments = await buildBilingualSegments(clipped, cfg, ctx, model, fork);
+				if (segments) {
+					pi.appendEntry<TranslationCard>(ENTRY_TYPE, { native: cfg.native, segments });
+					return true;
+				}
+
+				// Fallback: whole-text translation as a plain card.
+				const translated = await runLlm(ctx, model, buildWholeTranslatePrompt(clipped, cfg, !!fork), ctx.signal, fork);
+				if (!translated) return false;
 				pi.appendEntry<TranslationCard>(ENTRY_TYPE, { native: cfg.native, text: translated });
-			} else {
-				notify(`Translation failed (no API key for ${model.provider}/${model.id}?)`);
+				return true;
+			};
+
+			// Context mode must be strictly additive: a fork replay can fail in ways
+			// a plain request can't (the model answers with a tool call, the provider
+			// rejects the replayed prefix), so on failure retry context-free.
+			const fork = cfg.context ? deps.makeFork(ctx) : undefined;
+			let done = false;
+			try {
+				done = await attempt(fork);
+			} catch (err) {
+				if (!fork || ctx.signal?.aborted) throw err;
 			}
+			if (!done && fork && !ctx.signal?.aborted) done = await attempt(undefined);
+			if (!done) notify(`Translation failed (no API key for ${model.provider}/${model.id}?)`);
 		} catch {
 			notify("Translation failed");
 		} finally {

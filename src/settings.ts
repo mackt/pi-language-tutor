@@ -27,7 +27,7 @@ export function warnOnCacheMismatch(ctx: ExtensionContext, cfg: Config): void {
 	const sessionModel = `${ctx.model.provider}/${ctx.model.id}`;
 	if (cfg.model === sessionModel) return;
 	ctx.ui.notify(
-		`/lang model is ${cfg.model} but the session model is ${sessionModel} — context-mode translations can't reuse the session's prompt cache, so the whole history is re-billed at full input price on every translation. Run "/lang model default" to follow the session model.`,
+		`/lang model is ${cfg.model} but the session model is ${sessionModel} — context-mode translations can't reuse the session's prompt cache, so the whole history is re-billed at full input price on every translation, and the entire conversation (not just the translated text) is sent to ${cfg.model}'s provider. Run "/lang model default" to follow the session model.`,
 		"warning",
 	);
 }
@@ -340,5 +340,10 @@ export function registerLangSettings(pi: ExtensionAPI, deps: SettingsDeps): void
 		const cfg = loadConfig();
 		updateStatus(ctx, cfg);
 		warnOnCacheMismatch(ctx, cfg);
+	});
+
+	// Switching the session model mid-session (/model) can also create the mismatch.
+	pi.on("model_select", (_event, ctx) => {
+		warnOnCacheMismatch(ctx, loadConfig());
 	});
 }

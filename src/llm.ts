@@ -6,6 +6,7 @@
 
 import { completeSimple } from "@earendil-works/pi-ai/compat";
 import type { Message, SimpleStreamOptions, Tool } from "@earendil-works/pi-ai/compat";
+import { convertToLlm } from "@earendil-works/pi-coding-agent";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { Config } from "./core.ts";
 
@@ -61,9 +62,17 @@ export async function runLlm(
 			headers: auth.headers,
 			env: auth.env,
 			signal,
-			...(fork ? { reasoning: fork.reasoning } : {}),
+			// Providers that key their prompt cache on a session ID (OpenAI
+			// Responses, Mistral Conversations) only reuse the main session's
+			// cache if the fork sends the same ID.
+			...(fork ? { reasoning: fork.reasoning, sessionId: ctx.sessionManager.getSessionId() } : {}),
 		},
 	);
+
+	// A fork replays the agent's system prompt and tool definitions, so the
+	// model may answer with a tool call instead of text. Report failure so the
+	// caller can retry without the fork.
+	if (response.stopReason === "toolUse") return undefined;
 
 	return response.content
 		.filter((c): c is { type: "text"; text: string } => c.type === "text")
@@ -78,14 +87,23 @@ export async function runLlm(
  * (callers then fall back to a context-free call).
  */
 export function createForkTracker(pi: ExtensionAPI): { makeFork(ctx: ExtensionContext): ForkContext | undefined } {
-	// Messages of the main session's most recent LLM request (LLM-visible roles only).
+	// Messages of the main session's most recent LLM request, converted with the
+	// same convertToLlm pi's agent uses — a hand-rolled filter would drop bash
+	// executions, custom messages, and compaction/branch summaries, breaking the
+	// byte-identical prefix the prompt cache needs.
 	let sessionLlmMessages: Message[] | undefined;
 
 	pi.on("context", (event) => {
-		sessionLlmMessages = event.messages.filter(
-			(m): m is Message => m.role === "user" || m.role === "assistant" || m.role === "toolResult",
-		);
+		sessionLlmMessages = convertToLlm(event.messages);
 	});
+
+	// The snapshot describes the branch the last request ran on; after tree
+	// navigation or a session switch it no longer matches what the user sees.
+	const clear = () => {
+		sessionLlmMessages = undefined;
+	};
+	pi.on("session_tree", clear);
+	pi.on("session_start", clear);
 
 	/** The agent's active tool definitions, in the order the agent sends them. */
 	const sessionTools = (): Tool[] | undefined => {
