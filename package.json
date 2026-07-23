@@ -17,7 +17,11 @@
 	"image": "https://raw.githubusercontent.com/mackt/pi-language-tutor/main/docs/writing-check.png",
 	"scripts": {
 		"check": "tsc --noEmit",
-		"test": "vitest run"
+		"test": "vitest run",
+		"lint": "oxlint",
+		"lint:fix": "oxlint --fix",
+		"fmt": "oxfmt",
+		"fmt:check": "oxfmt --check"
 	},
 	"keywords": [
 		"pi",
@@ -30,6 +34,8 @@
 		"@earendil-works/pi-coding-agent": "^0.80.6",
 		"@earendil-works/pi-tui": "^0.80.6",
 		"@types/node": "^26.1.1",
+		"oxfmt": "0.42.0",
+		"oxlint": "1.63.0",
 		"typescript": "^5.7.0",
 		"vitest": "^4.1.10"
 	},
