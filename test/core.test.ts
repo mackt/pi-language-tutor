@@ -7,7 +7,7 @@ import {
   buildSegmentPrompt,
   buildWholeTranslatePrompt,
   CONTEXT_PREFACE,
-  matchModelReference,
+  resolveModelReference,
   getProviderStreamSimple
 } from '../language-learn.ts'
 import { resolveModel } from '../src/llm.ts'
@@ -226,52 +226,70 @@ describe('getProviderStreamSimple (custom providers, e.g. cursor-sdk)', () => {
   })
 })
 
-describe('matchModelReference', () => {
-  const models = [
-    { provider: 'openai', id: 'gpt-4o-mini' },
-    { provider: 'azure', id: 'gpt-4o-mini' },
-    { provider: 'anthropic', id: 'claude-sonnet-5' },
-    { provider: 'openrouter', id: 'openai/gpt-4o-mini' }
-  ]
+describe('resolveModelReference (pi CLI -m semantics)', () => {
+  const zai = { provider: 'zai', id: 'glm-5' }
+  const gateway = { provider: 'gateway', id: 'zai/glm-5' }
+  const openai = { provider: 'openai', id: 'gpt-4o-mini' }
+  const azure = { provider: 'azure', id: 'gpt-4o-mini' }
+  const catalog = [zai, gateway, openai, azure]
 
-  it('canonical provider/id wins over a same-named bare id elsewhere', () => {
-    expect(matchModelReference('openai/gpt-4o-mini', models)).toEqual({
+  it('prefers the provider interpretation over a raw-id lookalike', () => {
+    expect(resolveModelReference('zai/glm-5', catalog, catalog)).toEqual({
       kind: 'found',
-      model: { provider: 'openai', id: 'gpt-4o-mini' }
+      model: zai
     })
   })
-  it('resolves a model id that itself contains a slash', () => {
-    expect(matchModelReference('openrouter/openai/gpt-4o-mini', models)).toEqual({
+  it('canonical ref reaches a model whose id contains a slash', () => {
+    expect(resolveModelReference('gateway/zai/glm-5', catalog, catalog)).toEqual({
       kind: 'found',
-      model: { provider: 'openrouter', id: 'openai/gpt-4o-mini' }
+      model: gateway
     })
   })
-  it('resolves a unique bare id', () => {
-    expect(matchModelReference('claude-sonnet-5', models)).toEqual({
+  it('auth-aware tiebreak: unauthed provider ref falls to the unique authed raw id', () => {
+    expect(resolveModelReference('zai/glm-5', [gateway], catalog)).toEqual({
       kind: 'found',
-      model: { provider: 'anthropic', id: 'claude-sonnet-5' }
+      model: gateway
+    })
+  })
+  it('needsAuth when the provider ref has no authed raw-id lookalike', () => {
+    expect(resolveModelReference('openai/gpt-4o-mini', [azure], catalog)).toEqual({
+      kind: 'needsAuth',
+      model: openai
+    })
+  })
+  it('known provider without that model still matches the whole ref as a raw id', () => {
+    const zaiOther = { provider: 'zai', id: 'glm-4' }
+    expect(resolveModelReference('zai/glm-5', [gateway, zaiOther], [gateway, zaiOther])).toEqual({
+      kind: 'found',
+      model: gateway
+    })
+  })
+  it('resolves a unique bare id among configured-auth models', () => {
+    expect(resolveModelReference('glm-5', [zai, openai], catalog)).toEqual({
+      kind: 'found',
+      model: zai
     })
   })
   it('reports an ambiguous bare id with its candidates', () => {
-    expect(matchModelReference('gpt-4o-mini', models)).toEqual({
+    expect(resolveModelReference('gpt-4o-mini', catalog, catalog)).toEqual({
       kind: 'ambiguous',
-      candidates: [
-        { provider: 'openai', id: 'gpt-4o-mini' },
-        { provider: 'azure', id: 'gpt-4o-mini' }
-      ]
+      candidates: [openai, azure]
+    })
+  })
+  it('bare id known only to unconfigured catalogs reports noAuthAnywhere', () => {
+    expect(resolveModelReference('gpt-4o-mini', [], catalog)).toEqual({
+      kind: 'noAuthAnywhere',
+      candidates: [openai, azure]
     })
   })
   it('matches case-insensitively', () => {
-    expect(matchModelReference('Anthropic/Claude-Sonnet-5', models).kind).toBe('found')
-  })
-  it('tolerates spaces around the slash', () => {
-    expect(matchModelReference('anthropic / claude-sonnet-5', models).kind).toBe('found')
+    expect(resolveModelReference('ZAI/GLM-5', catalog, catalog).kind).toBe('found')
   })
   it('unknown reference', () => {
-    expect(matchModelReference('gpt-nonexistent', models)).toEqual({ kind: 'none' })
+    expect(resolveModelReference('gpt-nonexistent', catalog, catalog)).toEqual({ kind: 'none' })
   })
   it('empty reference', () => {
-    expect(matchModelReference('  ', models)).toEqual({ kind: 'none' })
+    expect(resolveModelReference('  ', catalog, catalog)).toEqual({ kind: 'none' })
   })
 })
 
@@ -284,7 +302,7 @@ const lang = (model?: string, context = false) => ({
   context
 })
 
-describe('resolveModel (available-first, catalog fallback)', () => {
+describe('resolveModel (pi CLI semantics over available/catalog)', () => {
   const openai = { provider: 'openai', id: 'gpt-4o-mini' }
   const azure = { provider: 'azure', id: 'gpt-4o-mini' }
   const cloudflare = { provider: 'cloudflare', id: 'gpt-4o-mini' }
@@ -342,5 +360,39 @@ describe('warnOnCacheMismatch', () => {
     const notes: string[] = []
     warnOnCacheMismatch(ctx(notes), lang('glm-5', false) as never)
     expect(notes).toEqual([])
+  })
+})
+
+describe('slash-containing refs follow pi CLI semantics (OpenRouter-style ids)', () => {
+  const openai = { provider: 'openai', id: 'gpt-4o-mini' }
+  const openrouter = { provider: 'openrouter', id: 'openai/gpt-4o-mini' }
+  const session = { provider: 'anthropic', id: 'claude-sonnet-5' }
+  const catalog = [openai, openrouter, session]
+  const ctx = (available: unknown[]) =>
+    ({
+      modelRegistry: { getAvailable: () => available, getAll: () => catalog },
+      model: session
+    }) as never
+
+  it('unauthed provider ref with a unique authed raw-id lookalike takes the authed model (pi tiebreak)', () => {
+    expect(resolveModel(ctx([openrouter, session]), lang('openai/gpt-4o-mini') as never)).toBe(
+      openrouter
+    )
+  })
+  it('the openrouter model stays reachable through its canonical ref', () => {
+    expect(
+      resolveModel(ctx([openrouter, session]), lang('openrouter/openai/gpt-4o-mini') as never)
+    ).toBe(openrouter)
+  })
+  it('a slash-containing reference matching no catalog provider still resolves as a bare id', () => {
+    const orphan = { provider: 'openrouter', id: 'mistral/devstral' }
+    const registry = {
+      modelRegistry: { getAvailable: () => [orphan, session], getAll: () => [orphan, session] },
+      model: session
+    } as never
+    expect(resolveModel(registry, lang('mistral/devstral') as never)).toBe(orphan)
+  })
+  it('a bare id that lost auth everywhere still resolves from the catalog (fails visibly later)', () => {
+    expect(resolveModel(ctx([session]), lang('gpt-4o-mini') as never)).toBe(openai)
   })
 })

@@ -16,7 +16,7 @@ import {
   Text
 } from '@earendil-works/pi-tui'
 import { loadConfig, saveConfig } from './config.ts'
-import { matchModelReference } from './core.ts'
+import { resolveModelReference } from './core.ts'
 import type { Config } from './core.ts'
 
 export const STATUS_KEY = 'language-learn'
@@ -37,7 +37,8 @@ export function warnOnCacheMismatch(ctx: ExtensionContext, cfg: Config): void {
   // A hand-edited config may hold a bare id or a differently-cased ref that
   // still resolves to the session model; compare resolved identities, not
   // the raw string.
-  const match = matchModelReference(cfg.model, ctx.modelRegistry.getAll())
+  const all = ctx.modelRegistry.getAll()
+  const match = resolveModelReference(cfg.model, all, all)
   const override = match.kind === 'found' ? `${match.model.provider}/${match.model.id}` : cfg.model
   if (override === sessionModel) return
   ctx.ui.notify(
@@ -348,38 +349,43 @@ export function registerLangSettings(pi: ExtensionAPI, deps: SettingsDeps): void
           if (value === 'default') {
             cfg.model = undefined
           } else {
-            // Resolve against configured-auth models, like pi's own /model:
-            // a bare id shadowed by unconfigured providers' catalogs stays
-            // unambiguous. The full catalog is only consulted for the error
-            // message, to tell "needs /login" apart from "does not exist".
-            const match = matchModelReference(value, ctx.modelRegistry.getAvailable())
-            if (match.kind === 'ambiguous') {
-              const refs = match.candidates.map((m) => `${m.provider}/${m.id}`).join(', ')
+            // pi CLI's -m semantics: provider-prefix interpretation first,
+            // auth-aware tiebreak, then the whole reference as a raw model id
+            // (OpenRouter-style). The full catalog shapes the errors, to tell
+            // "needs /login" apart from "does not exist".
+            const resolved = resolveModelReference(
+              value,
+              ctx.modelRegistry.getAvailable(),
+              ctx.modelRegistry.getAll()
+            )
+            if (resolved.kind === 'ambiguous') {
+              const refs = resolved.candidates.map((m) => `${m.provider}/${m.id}`).join(', ')
               ctx.ui.notify(`Ambiguous model id: ${value} — use one of: ${refs}`, 'warning')
               return
             }
-            if (match.kind === 'none') {
-              const inCatalog = matchModelReference(value, ctx.modelRegistry.getAll())
-              if (inCatalog.kind === 'found') {
-                ctx.ui.notify(
-                  `No auth configured for ${inCatalog.model.provider}/${inCatalog.model.id} — run /login ${inCatalog.model.provider} first`,
-                  'warning'
-                )
-              } else if (inCatalog.kind === 'ambiguous') {
-                const refs = inCatalog.candidates.map((m) => `${m.provider}/${m.id}`).join(', ')
-                ctx.ui.notify(
-                  `No auth configured for any provider of ${value} (${refs}) — run /login first`,
-                  'warning'
-                )
-              } else {
-                ctx.ui.notify(
-                  `Model not found: ${value} (expected <provider>/<id> or a unique model id)`,
-                  'warning'
-                )
-              }
+            if (resolved.kind === 'needsAuth') {
+              ctx.ui.notify(
+                `No auth configured for ${resolved.model.provider}/${resolved.model.id} — run /login ${resolved.model.provider} first`,
+                'warning'
+              )
               return
             }
-            const found = match.model
+            if (resolved.kind === 'noAuthAnywhere') {
+              const refs = resolved.candidates.map((m) => `${m.provider}/${m.id}`).join(', ')
+              ctx.ui.notify(
+                `No auth configured for any provider of ${value} (${refs}) — run /login first`,
+                'warning'
+              )
+              return
+            }
+            if (resolved.kind === 'none') {
+              ctx.ui.notify(
+                `Model not found: ${value} (expected <provider>/<id> or a unique model id)`,
+                'warning'
+              )
+              return
+            }
+            const found = resolved.model
             cfg.model = `${found.provider}/${found.id}`
             warnOnCacheMismatch(ctx, cfg)
           }
