@@ -308,9 +308,13 @@ export function resolveModelReference<M extends ModelRefLike>(
  * saved canonical `provider/id` is an already-disambiguated answer: restore
  * it exactly from the catalog — reporting `needsAuth` when its provider lost
  * auth, so side-calls fail visibly instead of being silently re-routed to an
- * authed provider whose raw id happens to spell the same. Only references
- * that match no canonical pair (hand-edited bare ids) fall back to the
- * interactive {@link resolveModelReference} semantics.
+ * authed provider whose raw id happens to spell the same. A ref whose prefix
+ * names a known provider but whose exact model left the catalog (dropped or
+ * renamed) resolves to nothing — the caller falls back to the session model —
+ * rather than raw-matching the string onto another provider's lookalike id.
+ * Only refs not interpretable as a provider choice (hand-edited bare ids, or
+ * raw ids whose prefix is no provider) fall back to the interactive
+ * {@link resolveModelReference} semantics.
  */
 export function resolveStoredModelReference<M extends ModelRefLike>(
   reference: string,
@@ -326,6 +330,11 @@ export function resolveStoredModelReference<M extends ModelRefLike>(
       (m) => m.provider === exact.model.provider && m.id === exact.model.id
     )
     return authed ? exact : { kind: 'needsAuth', model: exact.model }
+  }
+
+  const slash = ref.indexOf('/')
+  if (slash > 0 && catalog.some((m) => m.provider.toLowerCase() === ref.slice(0, slash))) {
+    return { kind: 'none' }
   }
 
   return resolveModelReference(reference, available, catalog)

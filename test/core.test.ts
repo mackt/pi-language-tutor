@@ -396,6 +396,19 @@ describe('resolveStoredModelReference (saved config refs)', () => {
       model: openai
     })
   })
+  it('a saved provider ref whose model left the catalog is not raw-matched onto a lookalike', () => {
+    const openaiOther = { provider: 'openai', id: 'gpt-4o' }
+    expect(
+      resolveStoredModelReference('openai/gpt-4o-mini', [openrouter], [openaiOther, openrouter])
+    ).toEqual({ kind: 'none' })
+  })
+  it('a raw id whose prefix names no provider still resolves interactively', () => {
+    const orphan = { provider: 'openrouter', id: 'mistral/devstral' }
+    expect(resolveStoredModelReference('mistral/devstral', [orphan], [orphan])).toEqual({
+      kind: 'found',
+      model: orphan
+    })
+  })
 })
 
 describe('slash-containing refs follow pi CLI semantics (OpenRouter-style ids)', () => {
