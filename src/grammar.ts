@@ -62,7 +62,13 @@ export function registerReview(pi: ExtensionAPI): { disable(ctx: ExtensionContex
       }
 
       if (result.mode === 'tutor') {
-        showTutorWidget(ctx, result.tutor)
+        // The prompt already withholds tutor mode when it is disabled; this
+        // guard covers a model that returns it anyway.
+        if (cfg.tutor) {
+          showTutorWidget(ctx, result.tutor)
+        } else {
+          ctx.ui.setWidget(WIDGET_KEY, undefined)
+        }
         return
       }
 

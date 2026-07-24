@@ -14,7 +14,8 @@ export const DEFAULT_CONFIG: Config = {
   native: 'zh-CN',
   enabled: true,
   auto: false,
-  context: false
+  context: false,
+  tutor: true
 }
 
 export function loadConfig(): Config {
@@ -26,7 +27,8 @@ export function loadConfig(): Config {
       model: typeof raw.model === 'string' ? raw.model : undefined,
       enabled: raw.enabled !== false,
       auto: raw.auto === true,
-      context: raw.context === true
+      context: raw.context === true,
+      tutor: raw.tutor !== false
     }
   } catch {
     return { ...DEFAULT_CONFIG }

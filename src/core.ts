@@ -12,6 +12,8 @@ export interface Config {
   auto: boolean
   /** Fork the main session's context into translation calls (default off: costs cache reads). */
   context: boolean
+  /** Teach native-language prompts via the writing tutor (default on; off restores check-only). */
+  tutor: boolean
 }
 
 export interface GrammarItem {
@@ -135,6 +137,25 @@ export function shouldSkipCheck(text: string): boolean {
 }
 
 export function buildReviewPrompt(text: string, cfg: Config): string {
+  const tutorBranch = cfg.tutor
+    ? [
+        `If the message is NOT primarily written in ${cfg.learning} — e.g. it is in ${cfg.native} or another language (mode "tutor") — the student could not express it in ${cfg.learning}; teach them how:`,
+        `  {"mode": "tutor", "sentence": "...", "words": [{"word": "...", "note": "..."}], "grammar": [{"structure": "...", "note": "..."}]}`,
+        `  - "sentence": a natural, idiomatic ${cfg.learning} rendering of the student's WHOLE thought (not a word-by-word gloss).`,
+        `  - "words": the key vocabulary worth learning (at most 5). "word" is the ${cfg.learning} word/phrase exactly as used in "sentence". "note" is a short explanation in ${cfg.native}: meaning, usage, register, and why this word over an obvious synonym.`,
+        `  - "grammar": the grammatical structures carrying the sentence (at most 3). "structure" names the structure (e.g. tense, mood, particle, clause shape, agreement). "note" explains in ${cfg.native} what it is and why it is used here.`,
+        `  - If the message is too short, code, or has no clear meaning to teach, return {"mode": "skip"} instead.`,
+        ``,
+        `If neither mode fits (too short, code, unclear): {"mode": "skip"}`
+      ]
+    : [
+        `If the message is NOT primarily written in ${cfg.learning}, or neither rule applies (too short, code, unclear): {"mode": "skip"}`
+      ]
+  const tutorRule = cfg.tutor
+    ? [
+        `- A message already correct in ${cfg.learning} is mode "check" with empty items, NOT "tutor".`
+      ]
+    : []
   return [
     `You are a ${cfg.learning} language tutor. The student's native language is ${cfg.native}.`,
     `The student typed the following message to an AI coding assistant. Decide which mode applies, then respond accordingly.`,
@@ -147,18 +168,11 @@ export function buildReviewPrompt(text: string, cfg: Config): string {
     `  - "rephrase": only if the message is understandable but sounds noticeably non-native, give ONE more natural way to phrase it in ${cfg.learning}; otherwise null.`,
     `  - A correct message: {"mode": "check", "items": [], "rephrase": null}.`,
     ``,
-    `If the message is NOT primarily written in ${cfg.learning} — e.g. it is in ${cfg.native} or another language (mode "tutor") — the student could not express it in ${cfg.learning}; teach them how:`,
-    `  {"mode": "tutor", "sentence": "...", "words": [{"word": "...", "note": "..."}], "grammar": [{"structure": "...", "note": "..."}]}`,
-    `  - "sentence": a natural, idiomatic ${cfg.learning} rendering of the student's WHOLE thought (not a word-by-word gloss).`,
-    `  - "words": the key vocabulary worth learning (at most 5). "word" is the ${cfg.learning} word/phrase exactly as used in "sentence". "note" is a short explanation in ${cfg.native}: meaning, usage, register, and why this word over an obvious synonym.`,
-    `  - "grammar": the grammatical structures carrying the sentence (at most 3). "structure" names the structure (e.g. tense, mood, particle, clause shape, agreement). "note" explains in ${cfg.native} what it is and why it is used here.`,
-    `  - If the message is too short, code, or has no clear meaning to teach, return {"mode": "skip"} instead.`,
-    ``,
-    `If neither mode fits (too short, code, unclear): {"mode": "skip"}`,
+    ...tutorBranch,
     ``,
     `Rules:`,
     `- Ignore code, file paths, identifiers, product names, and technical jargon — do not try to fix or translate them.`,
-    `- A message already correct in ${cfg.learning} is mode "check" with empty items, NOT "tutor".`,
+    ...tutorRule,
     `- Never invent errors, never invent vocabulary the student did not express.`,
     ``,
     `Message:`,

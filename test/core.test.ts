@@ -238,7 +238,14 @@ describe('cardMarkdown', () => {
 })
 
 describe('buildReviewPrompt', () => {
-  const cfg = { learning: 'en', native: 'zh-CN', enabled: true, auto: false, context: false }
+  const cfg = {
+    learning: 'en',
+    native: 'zh-CN',
+    enabled: true,
+    auto: false,
+    context: false,
+    tutor: true
+  }
   const prompt = buildReviewPrompt('some prompt', cfg)
   it('mentions both modes and the learning language', () => {
     expect(prompt).toContain('mode "check"')
@@ -255,10 +262,35 @@ describe('buildReviewPrompt', () => {
     expect(prompt).toContain('"grammar"')
     expect(prompt).toContain(cfg.native)
   })
+
+  describe('with tutor off', () => {
+    const offPrompt = buildReviewPrompt('some prompt', { ...cfg, tutor: false })
+    it('withholds tutor mode entirely', () => {
+      expect(offPrompt).not.toContain('mode "tutor"')
+      expect(offPrompt).not.toContain('"sentence"')
+      expect(offPrompt).not.toContain('"words"')
+    })
+    it('routes non-learning-language messages to skip instead', () => {
+      expect(offPrompt).toContain(`NOT primarily written in ${cfg.learning}`)
+      expect(offPrompt).toContain('{"mode": "skip"}')
+    })
+    it('keeps the check mode intact', () => {
+      expect(offPrompt).toContain('mode "check"')
+      expect(offPrompt).toContain('"rephrase"')
+      expect(offPrompt).toContain('<<<\nsome prompt\n>>>')
+    })
+  })
 })
 
 describe('prompt builders', () => {
-  const cfg = { learning: 'en', native: 'zh-CN', enabled: true, auto: false, context: false }
+  const cfg = {
+    learning: 'en',
+    native: 'zh-CN',
+    enabled: true,
+    auto: false,
+    context: false,
+    tutor: true
+  }
 
   it('segment prompt numbers segments and pins the count', () => {
     const sp = buildSegmentPrompt(['a', 'b'], cfg)
@@ -478,7 +510,8 @@ const lang = (model?: string, context = false) => ({
   model,
   enabled: true,
   auto: false,
-  context
+  context,
+  tutor: true
 })
 
 describe('resolveModel (pi CLI semantics over available/catalog)', () => {
