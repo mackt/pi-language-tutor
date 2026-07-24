@@ -7,7 +7,9 @@ import {
   cardMarkdown,
   buildSegmentPrompt,
   buildWholeTranslatePrompt,
+  CHECK_CONTEXT_PREFACE,
   CONTEXT_PREFACE,
+  normalizeStoredConfig,
   resolveModelReference,
   resolveStoredModelReference
 } from '../language-learn.ts'
@@ -156,6 +158,29 @@ describe('parseReviewResult', () => {
   it('garbage', () => {
     expect(parseReviewResult('I cannot help with that')).toBeUndefined()
   })
+  it('non-review JSON (no mode/items/rephrase) is rejected, not treated as a clean check', () => {
+    expect(parseReviewResult('{"name": "pkg", "version": "1.0.0"}')).toBeUndefined()
+  })
+  it('mode-less JSON whose items are not review items is rejected too', () => {
+    expect(parseReviewResult('{"items": [{"name": "pkg", "version": "1.0.0"}]}')).toBeUndefined()
+  })
+  it('mode-less object with an empty items array still parses as a legacy clean check', () => {
+    expect(parseReviewResult('{"items": []}')).toEqual({ mode: 'check', items: [], rephrase: null })
+  })
+  it('mode-less object with one well-formed item still parses as check', () => {
+    expect(parseReviewResult('{"items": [{"wrong":"a","right":"b","reason":"c"}]}')).toEqual({
+      mode: 'check',
+      items: [{ wrong: 'a', right: 'b', reason: 'c' }],
+      rephrase: null
+    })
+  })
+  it('mode-less object with only rephrase still parses as check', () => {
+    expect(parseReviewResult('{"rephrase": "Better phrasing."}')).toEqual({
+      mode: 'check',
+      items: [],
+      rephrase: 'Better phrasing.'
+    })
+  })
   it('truncated json', () => {
     expect(parseReviewResult('{"mode": "check", "items": [{"wrong": "a"')).toBeUndefined()
   })
@@ -241,7 +266,7 @@ describe('buildReviewPrompt', () => {
   const cfg = {
     learning: 'en',
     native: 'zh-CN',
-    enabled: true,
+    check: 'on' as const,
     auto: false,
     context: false,
     tutor: true
@@ -286,11 +311,18 @@ describe('prompt builders', () => {
   const cfg = {
     learning: 'en',
     native: 'zh-CN',
-    enabled: true,
+    check: 'on' as const,
     auto: false,
     context: false,
     tutor: true
   }
+
+  it('review prompt has no context preface by default', () => {
+    expect(buildReviewPrompt('some text', cfg)).not.toContain(CHECK_CONTEXT_PREFACE)
+  })
+  it('contextual review prompt starts with the check preface', () => {
+    expect(buildReviewPrompt('some text', cfg, true).startsWith(CHECK_CONTEXT_PREFACE)).toBe(true)
+  })
 
   it('segment prompt numbers segments and pins the count', () => {
     const sp = buildSegmentPrompt(['a', 'b'], cfg)
@@ -508,10 +540,35 @@ const lang = (model?: string, context = false) => ({
   learning: 'en',
   native: 'zh-CN',
   model,
-  enabled: true,
+  check: 'on' as const,
   auto: false,
   context,
   tutor: true
+})
+
+describe('normalizeStoredConfig', () => {
+  it('defaults to check on', () => {
+    expect(normalizeStoredConfig({}).check).toBe('on')
+  })
+  it('migrates legacy enabled: false to check off', () => {
+    expect(normalizeStoredConfig({ enabled: false }).check).toBe('off')
+  })
+  it('migrates legacy enabled: true to check on', () => {
+    expect(normalizeStoredConfig({ enabled: true }).check).toBe('on')
+  })
+  it('keeps an explicit tri-state check value', () => {
+    expect(normalizeStoredConfig({ check: 'context' }).check).toBe('context')
+  })
+  it('an explicit check value wins over a stale legacy enabled flag', () => {
+    expect(normalizeStoredConfig({ check: 'context', enabled: false }).check).toBe('context')
+  })
+  it('rejects an invalid check value back to the default', () => {
+    expect(normalizeStoredConfig({ check: 'sometimes' as never }).check).toBe('on')
+  })
+  it('defaults tutor to on and keeps an explicit tutor: false', () => {
+    expect(normalizeStoredConfig({}).tutor).toBe(true)
+    expect(normalizeStoredConfig({ tutor: false }).tutor).toBe(false)
+  })
 })
 
 describe('resolveModel (pi CLI semantics over available/catalog)', () => {
@@ -581,6 +638,23 @@ describe('warnOnCacheMismatch', () => {
       lang('gpt-4o-mini', true) as never
     )
     expect(notes).toEqual([])
+  })
+  it('names translations when only translation context is on', () => {
+    const notes: string[] = []
+    warnOnCacheMismatch(ctx(notes), lang('glm-5', true) as never)
+    expect(notes[0]).toContain('context-mode translations')
+    expect(notes[0]).not.toContain('writing checks')
+  })
+  it('names writing checks when only check context is on', () => {
+    const notes: string[] = []
+    warnOnCacheMismatch(ctx(notes), { ...lang('glm-5', false), check: 'context' } as never)
+    expect(notes[0]).toContain('context-mode writing checks')
+    expect(notes[0]).not.toContain('translations')
+  })
+  it('names both when translation and check context are on', () => {
+    const notes: string[] = []
+    warnOnCacheMismatch(ctx(notes), { ...lang('glm-5', true), check: 'context' } as never)
+    expect(notes[0]).toContain('translations and writing checks')
   })
 })
 

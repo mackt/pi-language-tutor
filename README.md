@@ -75,18 +75,18 @@ That is enough to start.
 
 Type `/lang` in the TUI to open the interactive settings menu, or set things directly with the commands below.
 
-| Command                     | What it does                                                                              |
-| --------------------------- | ----------------------------------------------------------------------------------------- |
-| `/translate` or `alt+t`     | Translate the last assistant response (bilingual card)                                    |
-| `/lang`                     | Open the interactive settings menu — every option with an inline description              |
-| `/lang on` \| `off`         | Resume / pause the writing check & tutor                                                  |
-| `/lang tutor on` \| `off`   | Keep / drop just the writing tutor (off: native-language prompts show no panel)           |
-| `/lang auto on` \| `off`    | Auto-translate every final response                                                       |
-| `/lang native <code>`       | Set your native language — translation target and explanation language (`zh-CN`, `ja`, …) |
-| `/lang learning <code>`     | Set the language you are practicing (`en`, `fr`, …)                                       |
-| `/lang model [model]`       | Set the model this extension uses                                                         |
-| `/lang model default`       | Go back to the session model                                                              |
-| `/lang context on` \| `off` | Give translations the full session context (off by default; see below)                    |
+| Command                                | What it does                                                                                                           |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `/translate` or `alt+t`                | Translate the last assistant response (bilingual card)                                                                 |
+| `/lang`                                | Open the interactive settings menu — every option with an inline description                                           |
+| `/lang check off` \| `on` \| `context` | Writing check & tutor mode — `context` lets the review see the conversation (`/lang on`/`off` still work as shortcuts) |
+| `/lang tutor on` \| `off`              | Keep / drop just the writing tutor (off: native-language prompts show no panel)                                        |
+| `/lang auto on` \| `off`               | Auto-translate every final response                                                                                    |
+| `/lang native <code>`                  | Set your native language — translation target and explanation language (`zh-CN`, `ja`, …)                              |
+| `/lang learning <code>`                | Set the language you are practicing (`en`, `fr`, …)                                                                    |
+| `/lang model [model]`                  | Set the model this extension uses                                                                                      |
+| `/lang model default`                  | Go back to the session model                                                                                           |
+| `/lang context on` \| `off`            | Give translations the full session context (off by default; see below)                                                 |
 
 ## Configuration
 
@@ -97,7 +97,7 @@ Settings persist in `~/.pi/agent/language-learn.json`.
   "learning": "en",
   "native": "zh-CN",
   "model": "openai/gpt-4o-mini",
-  "enabled": true,
+  "check": "on",
   "auto": false,
   "context": false
 }
@@ -119,6 +119,8 @@ Settings persist in `~/.pi/agent/language-learn.json`.
 
 - It only pays off when translations use the **session model** — a `/lang model` override can't hit the session's cache, and the whole history would be re-billed at full input price on every translation. It also changes where your data goes: with an override, the entire conversation is sent to the override model's provider, not just the text being translated. The extension warns about this combination at startup and when you switch; `/lang model default` fixes it.
 - Before the first agent turn of a session there is no captured request yet, so translations quietly fall back to context-free.
+
+The writing check & tutor has its own context state (`/lang check context`), kept separate on purpose: the review fires on every message you send, so each reviewed message costs one cache read. Enable it only if the check keeps flagging project terms as errors — a contextual review recognizes names and coined words the session established, and the tutor can use them when teaching you how to express the message.
 
 ## Development
 
