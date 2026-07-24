@@ -2,7 +2,7 @@
 
 English | [简体中文](README.zh-CN.md)
 
-Learn a foreign language while you code. A [pi](https://pi.dev) extension that reviews your prompts for spelling, grammar, and natural phrasing — with explanations in your native language — and renders agent replies as bilingual immersive translations.
+Learn a foreign language while you code. A [pi](https://pi.dev) extension that reviews your prompts for spelling, grammar, and natural phrasing — with explanations in your native language — teaches you how to express thoughts you couldn't yet say in the learning language, and renders agent replies as bilingual immersive translations.
 
 <img src="https://raw.githubusercontent.com/mackt/pi-language-tutor/main/docs/writing-check.png" width="720" alt="The Writing check panel: while the agent works on the prompt, each mistake is shown with its fix, an explanation in your native language, and a more natural phrasing of the whole sentence.">
 
@@ -44,11 +44,19 @@ ln -s "$(pwd)/pi-language-tutor" ~/.pi/agent/extensions/pi-language-tutor
 
    While the agent answers, a `✏ Writing check` panel appears above the editor: each mistake with its fix and a short explanation in your native language, plus a more natural phrasing of the whole sentence.
 
-2. When the agent finishes, press `alt+t` (macOS: ⌥T — [enable Option-as-Meta](https://iterm2.com/documentation-preferences-profiles-keys.html) in your terminal, or run `/translate`). The response re-renders as a bilingual card: each paragraph followed by its translation.
+2. Write a prompt in your **native** language instead — because the thought came faster that way, or you couldn't yet express it in the learning language:
+
+   ```text
+   我想重构这个函数但是不知道怎么下手
+   ```
+
+   A `✏ Writing tutor` panel appears: a natural whole-sentence rendering in the learning language, the key new words (each explained in your native language — meaning, usage, why this word over a synonym), and the grammatical structures carrying the sentence. One panel teaches you how to say what you couldn't.
+
+3. When the agent finishes, press `alt+t` (macOS: ⌥T — [enable Option-as-Meta](https://iterm2.com/documentation-preferences-profiles-keys.html) in your terminal, or run `/translate`). The response re-renders as a bilingual card: each paragraph followed by its translation.
 
    <img src="https://raw.githubusercontent.com/mackt/pi-language-tutor/main/docs/bilingual-card.png" width="720" alt="The bilingual card: each paragraph of the agent's response is followed by its translation, immersive-translate style, with code blocks kept intact.">
 
-3. Like the bilingual view? Make it automatic:
+4. Like the bilingual view? Make it automatic:
 
    ```text
    /lang auto on
@@ -58,9 +66,10 @@ That is enough to start.
 
 ## What happens
 
-- **Nothing ever blocks.** Your message goes to the agent immediately; the writing check runs in parallel and the panel appears a moment later. A clean message shows no panel at all.
+- **Nothing ever blocks.** Your message goes to the agent immediately; the review runs in parallel and the panel appears a moment later. A clean message shows no panel at all.
+- **Two complementary panels, never both.** Prompt in the learning language → `✏ Writing check` fixes your mistakes. Prompt in your native language → `✏ Writing tutor` teaches you the words, grammar, and whole-sentence expression. One LLM call decides which — they never both fire.
 - **Nothing pollutes the conversation.** Translation cards live only in your terminal — they are never sent back to the LLM and cost no context.
-- **You control the spend.** Both features use your session model by default; point them at a cheaper one with `/lang model` and every check becomes nearly free.
+- **You control the spend.** All features use your session model by default; point them at a cheaper one with `/lang model` and every review becomes nearly free.
 
 ## Settings
 
@@ -70,7 +79,7 @@ Type `/lang` in the TUI to open the interactive settings menu, or set things dir
 | --------------------------- | ----------------------------------------------------------------------------------------- |
 | `/translate` or `alt+t`     | Translate the last assistant response (bilingual card)                                    |
 | `/lang`                     | Open the interactive settings menu — every option with an inline description              |
-| `/lang on` \| `off`         | Resume / pause the writing check                                                          |
+| `/lang on` \| `off`         | Resume / pause the writing check & tutor                                                  |
 | `/lang auto on` \| `off`    | Auto-translate every final response                                                       |
 | `/lang native <code>`       | Set your native language — translation target and explanation language (`zh-CN`, `ja`, …) |
 | `/lang learning <code>`     | Set the language you are practicing (`en`, `fr`, …)                                       |
@@ -97,7 +106,9 @@ Settings persist in `~/.pi/agent/language-learn.json`.
 
 ## Details
 
-**What gets checked.** To avoid wasted tokens and noise, the writing check skips: slash/bang commands, messages under 4 words, messages that are mostly code or paths, messages not written in the learning language, and everything while `/lang off`. Checks run only in interactive TUI mode, and a failed check never disturbs your session.
+**What gets reviewed.** To avoid wasted tokens and noise, the review skips: slash/bang commands, trivially short prompts, messages that are mostly code or paths, and everything while `/lang off`. CJK prompts are counted by characters, not whitespace words, so a substantial native-language prompt still reaches the tutor. Reviews run only in interactive TUI mode, and a failed review never disturbs your session.
+
+**Writing check vs. Writing tutor.** A single LLM call inspects each prompt and picks a mode. If the prompt is in your learning language, it reviews spelling, grammar, and phrasing (the `✏ Writing check` panel). If the prompt is in your native language — you couldn't yet express it in the learning language — it teaches instead (the `✏ Writing tutor` panel): a natural whole-sentence rendering, the key new vocabulary (each explained in your native language), and the grammatical structures at work. The two are complementary and never both fire on the same prompt.
 
 **Bilingual cards.** Paragraphs are aligned original-then-translation, immersive-translate style. Short code blocks (≤5 lines) are kept in the card; longer ones become a `[code block ↑ N lines]` placeholder since the original sits right above. Auto mode skips intermediate tool-call narration and responses under ~15 words; the footer shows `🌐 auto` while enabled.
 
@@ -116,4 +127,4 @@ npm run check   # typecheck
 npm test        # unit tests for the skip heuristics and response parsing
 ```
 
-Layout: `src/core.ts` holds the pure logic (heuristics, prompts, parsing, card assembly — what the tests import, zero pi imports) and `src/config.ts` the config persistence. The pi-facing side is split by feature: `src/llm.ts` (model resolution, LLM calls, session-fork tracking), `src/grammar.ts` (writing check), `src/translate.ts` (bilingual cards), `src/settings.ts` (`/lang` command and menu), with `src/index.ts` as the composition root wiring them together. `language-learn.ts` is the entry point re-exporting core and the default export.
+Layout: `src/core.ts` holds the pure logic (heuristics, prompts, parsing, card assembly — what the tests import, zero pi imports) and `src/config.ts` the config persistence. The pi-facing side is split by feature: `src/llm.ts` (model resolution, LLM calls, session-fork tracking), `src/grammar.ts` (the unified review: writing check + writing tutor dispatch), `src/tutor.ts` (the writing tutor renderer), `src/translate.ts` (bilingual cards), `src/settings.ts` (`/lang` command and menu), with `src/index.ts` as the composition root wiring them together. `language-learn.ts` is the entry point re-exporting core and the default export.
