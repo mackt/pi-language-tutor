@@ -616,6 +616,23 @@ describe('warnOnCacheMismatch', () => {
     )
     expect(notes).toEqual([])
   })
+  it('names translations when only translation context is on', () => {
+    const notes: string[] = []
+    warnOnCacheMismatch(ctx(notes), lang('glm-5', true) as never)
+    expect(notes[0]).toContain('context-mode translations')
+    expect(notes[0]).not.toContain('writing checks')
+  })
+  it('names writing checks when only check context is on', () => {
+    const notes: string[] = []
+    warnOnCacheMismatch(ctx(notes), { ...lang('glm-5', false), check: 'context' } as never)
+    expect(notes[0]).toContain('context-mode writing checks')
+    expect(notes[0]).not.toContain('translations')
+  })
+  it('names both when translation and check context are on', () => {
+    const notes: string[] = []
+    warnOnCacheMismatch(ctx(notes), { ...lang('glm-5', true), check: 'context' } as never)
+    expect(notes[0]).toContain('translations and writing checks')
+  })
 })
 
 describe('resolveStoredModelReference (saved config refs)', () => {
