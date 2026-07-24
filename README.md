@@ -101,7 +101,7 @@ Settings persist in `~/.pi/agent/language-learn.json`.
 
 **Bilingual cards.** Paragraphs are aligned original-then-translation, immersive-translate style. Short code blocks (≤5 lines) are kept in the card; longer ones become a `[code block ↑ N lines]` placeholder since the original sits right above. Auto mode skips intermediate tool-call narration and responses under ~15 words; the footer shows `🌐 auto` while enabled.
 
-**Custom providers.** On pi 0.81+, checks and translations prefer the provider's registered `streamSimple` (so custom APIs such as Cursor's `cursor-sdk` work). Built-in api ids still use pi-ai's `completeSimple`. On pi 0.80 the global api registry already covered custom providers.
+**Custom providers.** On pi 0.81+, checks and translations go through the composed provider's `streamSimple` — the same dispatch the main session uses — so custom providers work whether they were registered as a config (such as Cursor's `cursor-sdk`) or as a native `Provider` object. On pi 0.80 the extension falls back to pi-ai's `completeSimple`; the global api registry there already covered custom providers.
 
 **Context mode** (`/lang context on`, off by default). By default translations see only the message being translated, so pronouns, project names, and coined terms can come out generic. Context mode forks the session instead: the translation request replays the exact prefix of the main session's last LLM request (same tools, system prompt, and message history), so the provider serves the whole history from its prompt cache and you pay cache-read prices (~10% of input on Anthropic) plus the translation itself. Two things to know:
 
