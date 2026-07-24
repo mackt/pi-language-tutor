@@ -80,6 +80,7 @@ Type `/lang` in the TUI to open the interactive settings menu, or set things dir
 | `/translate` or `alt+t`     | Translate the last assistant response (bilingual card)                                    |
 | `/lang`                     | Open the interactive settings menu — every option with an inline description              |
 | `/lang on` \| `off`         | Resume / pause the writing check & tutor                                                  |
+| `/lang tutor on` \| `off`   | Keep / drop just the writing tutor (off: native-language prompts show no panel)           |
 | `/lang auto on` \| `off`    | Auto-translate every final response                                                       |
 | `/lang native <code>`       | Set your native language — translation target and explanation language (`zh-CN`, `ja`, …) |
 | `/lang learning <code>`     | Set the language you are practicing (`en`, `fr`, …)                                       |
@@ -108,7 +109,7 @@ Settings persist in `~/.pi/agent/language-learn.json`.
 
 **What gets reviewed.** To avoid wasted tokens and noise, the review skips: slash/bang commands, trivially short prompts, messages that are mostly code or paths, and everything while `/lang off`. CJK prompts are counted by characters, not whitespace words, so a substantial native-language prompt still reaches the tutor. Reviews run only in interactive TUI mode, and a failed review never disturbs your session.
 
-**Writing check vs. Writing tutor.** A single LLM call inspects each prompt and picks a mode. If the prompt is in your learning language, it reviews spelling, grammar, and phrasing (the `✏ Writing check` panel). If the prompt is in your native language — you couldn't yet express it in the learning language — it teaches instead (the `✏ Writing tutor` panel): a natural whole-sentence rendering, the key new vocabulary (each explained in your native language), and the grammatical structures at work. The two are complementary and never both fire on the same prompt.
+**Writing check vs. Writing tutor.** A single LLM call inspects each prompt and picks a mode. If the prompt is in your learning language, it reviews spelling, grammar, and phrasing (the `✏ Writing check` panel). If the prompt is in your native language — you couldn't yet express it in the learning language — it teaches instead (the `✏ Writing tutor` panel): a natural whole-sentence rendering, the key new vocabulary (each explained in your native language), and the grammatical structures at work. The two are complementary and never both fire on the same prompt. If you often write prompts in your native language on purpose and the tutor panel gets noisy, `/lang tutor off` restores the check-only behavior — native-language prompts then show no panel at all, while the writing check keeps working.
 
 **Bilingual cards.** Paragraphs are aligned original-then-translation, immersive-translate style. Short code blocks (≤5 lines) are kept in the card; longer ones become a `[code block ↑ N lines]` placeholder since the original sits right above. Auto mode skips intermediate tool-call narration and responses under ~15 words; the footer shows `🌐 auto` while enabled.
 

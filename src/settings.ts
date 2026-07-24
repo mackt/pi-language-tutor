@@ -96,7 +96,7 @@ async function openModelPicker(ctx: ExtensionContext, cfg: Config): Promise<void
 }
 
 const LANG_USAGE =
-  'Usage: /lang  (settings menu)  |  /lang on|off  |  /lang auto|context on|off  |  /lang native|learning <code>  |  /lang model [provider/id|id|default]'
+  'Usage: /lang  (settings menu)  |  /lang on|off  |  /lang auto|context|tutor on|off  |  /lang native|learning <code>  |  /lang model [provider/id|id|default]'
 
 const LANGUAGE_PRESETS: ReadonlyArray<{ code: string; name: string }> = [
   { code: 'en', name: 'English' },
@@ -115,6 +115,7 @@ const CUSTOM_LANG = '__custom__'
 const LANG_VALUE_COMPLETIONS: Record<string, string[]> = {
   auto: ['on', 'off'],
   context: ['on', 'off'],
+  tutor: ['on', 'off'],
   native: ['zh-CN', 'ja', 'ko', 'es', 'fr', 'de', 'pt', 'ru', 'en'],
   learning: ['en', 'zh-CN', 'ja', 'ko', 'es', 'fr', 'de', 'pt', 'ru'],
   model: ['default']
@@ -127,15 +128,19 @@ export interface SettingsDeps {
 
 /** Register the /lang command, its settings menu, and the session_start status/warning. */
 export function registerLangSettings(pi: ExtensionAPI, deps: SettingsDeps): void {
-  /** Apply a `check`/`auto`/`context` toggle; shared by the menu and the direct command. */
+  /** Apply a `check`/`auto`/`context`/`tutor` toggle; shared by the menu and the direct command. */
   const applyToggle = (
     ctx: ExtensionContext,
     cfg: Config,
-    key: 'check' | 'auto' | 'context',
+    key: 'check' | 'auto' | 'context' | 'tutor',
     on: boolean
   ) => {
     if (key === 'check') {
       cfg.enabled = on
+      if (!on) deps.disableReview(ctx)
+    } else if (key === 'tutor') {
+      cfg.tutor = on
+      // The shared widget may be showing a tutor panel right now; clear it.
       if (!on) deps.disableReview(ctx)
     } else if (key === 'auto') {
       cfg.auto = on
@@ -246,6 +251,14 @@ export function registerLangSettings(pi: ExtensionAPI, deps: SettingsDeps): void
             'Review prompts in your learning language (spelling/grammar) and teach prompts in your native language (words, grammar, whole-sentence expression) while the agent works'
         },
         {
+          id: 'tutor',
+          label: 'Writing tutor',
+          currentValue: cfg.tutor ? 'on' : 'off',
+          values: ['on', 'off'],
+          description:
+            'Teach prompts written in your native language (words, grammar, whole-sentence expression). Off restores the check-only behavior: native-language prompts show no panel'
+        },
+        {
           id: 'auto',
           label: 'Auto-translate',
           currentValue: cfg.auto ? 'on' : 'off',
@@ -293,7 +306,7 @@ export function registerLangSettings(pi: ExtensionAPI, deps: SettingsDeps): void
         items.length + 2,
         getSettingsListTheme(),
         (id, newValue) => {
-          if (id === 'check' || id === 'auto' || id === 'context') {
+          if (id === 'check' || id === 'auto' || id === 'context' || id === 'tutor') {
             applyToggle(ctx, cfg, id, newValue === 'on')
           } else if (id === 'native' || id === 'learning') {
             cfg[id] = newValue
@@ -331,8 +344,8 @@ export function registerLangSettings(pi: ExtensionAPI, deps: SettingsDeps): void
         )
         return values.length > 0 ? values.map((v) => ({ value: `${key} ${v}`, label: v })) : null
       }
-      const keys = ['on', 'off', 'auto', 'context', 'native', 'learning', 'model'].filter((k) =>
-        k.startsWith(prefix.trim().toLowerCase())
+      const keys = ['on', 'off', 'auto', 'context', 'tutor', 'native', 'learning', 'model'].filter(
+        (k) => k.startsWith(prefix.trim().toLowerCase())
       )
       return keys.length > 0
         ? keys.map((k) => ({ value: k === 'on' || k === 'off' ? k : `${k} `, label: k }))
@@ -344,7 +357,7 @@ export function registerLangSettings(pi: ExtensionAPI, deps: SettingsDeps): void
 
       const show = () =>
         ctx.ui.notify(
-          `learning=${cfg.learning}  native=${cfg.native}  model=${cfg.model ?? 'default (session model)'}  check=${cfg.enabled ? 'on' : 'off'}  auto=${cfg.auto ? 'on' : 'off'}  context=${cfg.context ? 'on' : 'off'}`,
+          `learning=${cfg.learning}  native=${cfg.native}  model=${cfg.model ?? 'default (session model)'}  check=${cfg.enabled ? 'on' : 'off'}  tutor=${cfg.tutor ? 'on' : 'off'}  auto=${cfg.auto ? 'on' : 'off'}  context=${cfg.context ? 'on' : 'off'}`,
           'info'
         )
 
@@ -364,6 +377,7 @@ export function registerLangSettings(pi: ExtensionAPI, deps: SettingsDeps): void
           break
         case 'auto':
         case 'context':
+        case 'tutor':
           if (value !== 'on' && value !== 'off') {
             ctx.ui.notify(`Usage: /lang ${sub} on|off`, 'warning')
             return
