@@ -244,6 +244,14 @@ export function parseReviewResult(raw: string): ReviewResult | undefined {
 
   if (obj.mode === 'skip' || obj.skip === true) return { mode: 'skip' }
 
+  // A JSON object with none of the review fields is not a review result at
+  // all (e.g. a forked replay where the agent prompt won and the model
+  // answered with unrelated JSON). Reject it so the caller treats it like
+  // garbage — for forked reviews that means retrying context-free.
+  if (obj.mode !== 'check' && !Array.isArray(obj.items) && obj.rephrase === undefined) {
+    return undefined
+  }
+
   // mode "check" (default — also tolerates responses that omit "mode")
   const items = Array.isArray(obj.items)
     ? obj.items.filter(

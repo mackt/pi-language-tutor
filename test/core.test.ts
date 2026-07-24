@@ -158,6 +158,16 @@ describe('parseReviewResult', () => {
   it('garbage', () => {
     expect(parseReviewResult('I cannot help with that')).toBeUndefined()
   })
+  it('non-review JSON (no mode/items/rephrase) is rejected, not treated as a clean check', () => {
+    expect(parseReviewResult('{"name": "pkg", "version": "1.0.0"}')).toBeUndefined()
+  })
+  it('mode-less object with only rephrase still parses as check', () => {
+    expect(parseReviewResult('{"rephrase": "Better phrasing."}')).toEqual({
+      mode: 'check',
+      items: [],
+      rephrase: 'Better phrasing.'
+    })
+  })
   it('truncated json', () => {
     expect(parseReviewResult('{"mode": "check", "items": [{"wrong": "a"')).toBeUndefined()
   })
