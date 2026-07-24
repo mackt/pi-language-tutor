@@ -244,14 +244,6 @@ export function parseReviewResult(raw: string): ReviewResult | undefined {
 
   if (obj.mode === 'skip' || obj.skip === true) return { mode: 'skip' }
 
-  // A JSON object with none of the review fields is not a review result at
-  // all (e.g. a forked replay where the agent prompt won and the model
-  // answered with unrelated JSON). Reject it so the caller treats it like
-  // garbage — for forked reviews that means retrying context-free.
-  if (obj.mode !== 'check' && !Array.isArray(obj.items) && obj.rephrase === undefined) {
-    return undefined
-  }
-
   // mode "check" (default — also tolerates responses that omit "mode")
   const items = Array.isArray(obj.items)
     ? obj.items.filter(
@@ -265,6 +257,19 @@ export function parseReviewResult(raw: string): ReviewResult | undefined {
     : []
   const rephrase =
     typeof obj.rephrase === 'string' && obj.rephrase.trim().length > 0 ? obj.rephrase.trim() : null
+
+  // Without an explicit mode, accept only genuine review evidence: an empty
+  // items array (legacy clean result), at least one well-formed item, or a
+  // string/null rephrase. Unrelated JSON that merely contains an items array
+  // (a forked replay where the agent prompt won) is rejected so the caller
+  // treats it like garbage — for forked reviews that means retrying
+  // context-free.
+  if (obj.mode !== 'check') {
+    const itemsEvidence = Array.isArray(obj.items) && (obj.items.length === 0 || items.length > 0)
+    const rephraseEvidence = typeof obj.rephrase === 'string' || obj.rephrase === null
+    if (!itemsEvidence && !rephraseEvidence) return undefined
+  }
+
   return { mode: 'check', items: items.slice(0, 5), rephrase }
 }
 

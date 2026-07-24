@@ -161,6 +161,19 @@ describe('parseReviewResult', () => {
   it('non-review JSON (no mode/items/rephrase) is rejected, not treated as a clean check', () => {
     expect(parseReviewResult('{"name": "pkg", "version": "1.0.0"}')).toBeUndefined()
   })
+  it('mode-less JSON whose items are not review items is rejected too', () => {
+    expect(parseReviewResult('{"items": [{"name": "pkg", "version": "1.0.0"}]}')).toBeUndefined()
+  })
+  it('mode-less object with an empty items array still parses as a legacy clean check', () => {
+    expect(parseReviewResult('{"items": []}')).toEqual({ mode: 'check', items: [], rephrase: null })
+  })
+  it('mode-less object with one well-formed item still parses as check', () => {
+    expect(parseReviewResult('{"items": [{"wrong":"a","right":"b","reason":"c"}]}')).toEqual({
+      mode: 'check',
+      items: [{ wrong: 'a', right: 'b', reason: 'c' }],
+      rephrase: null
+    })
+  })
   it('mode-less object with only rephrase still parses as check', () => {
     expect(parseReviewResult('{"rephrase": "Better phrasing."}')).toEqual({
       mode: 'check',
