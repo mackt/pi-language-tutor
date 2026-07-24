@@ -25,14 +25,15 @@ export const STATUS_KEY = 'language-learn'
 export function updateStatus(ctx: ExtensionContext, cfg: Config): void {
   if (!ctx.hasUI) return
   const parts: string[] = []
-  if (!cfg.enabled) parts.push('✏ lang off')
+  if (cfg.check === 'off') parts.push('✏ lang off')
   if (cfg.auto) parts.push('🌐 auto')
   ctx.ui.setStatus(STATUS_KEY, parts.length > 0 ? parts.join('  ') : undefined)
 }
 
 /** Warn when a model override defeats the whole point of context mode. */
 export function warnOnCacheMismatch(ctx: ExtensionContext, cfg: Config): void {
-  if (!cfg.context || !cfg.model || cfg.model === 'default' || !ctx.model) return
+  const wantsContext = cfg.context || cfg.check === 'context'
+  if (!wantsContext || !cfg.model || cfg.model === 'default' || !ctx.model) return
   const sessionModel = `${ctx.model.provider}/${ctx.model.id}`
   // A hand-edited config may hold a bare id or a differently-cased ref that
   // still resolves to the session model; compare resolved identities, not
@@ -48,8 +49,14 @@ export function warnOnCacheMismatch(ctx: ExtensionContext, cfg: Config): void {
       ? `${match.model.provider}/${match.model.id}`
       : cfg.model
   if (override === sessionModel) return
+  // Name the features actually running with context — a check-only warning
+  // must not claim the cost is per translation.
+  const contextual = [
+    ...(cfg.context ? ['translations'] : []),
+    ...(cfg.check === 'context' ? ['writing checks'] : [])
+  ].join(' and ')
   ctx.ui.notify(
-    `/lang model is ${override} but the session model is ${sessionModel} — context-mode translations can't reuse the session's prompt cache, so the whole history is re-billed at full input price on every translation, and the entire conversation (not just the translated text) is sent to ${override}'s provider. Run "/lang model default" to follow the session model.`,
+    `/lang model is ${override} but the session model is ${sessionModel} — context-mode ${contextual} can't reuse the session's prompt cache, so the whole history is re-billed at full input price on every one, and the entire conversation (not just the processed text) is sent to ${override}'s provider. Run "/lang model default" to follow the session model.`,
     'warning'
   )
 }
@@ -96,7 +103,7 @@ async function openModelPicker(ctx: ExtensionContext, cfg: Config): Promise<void
 }
 
 const LANG_USAGE =
-  'Usage: /lang  (settings menu)  |  /lang on|off  |  /lang auto|context|tutor on|off  |  /lang native|learning <code>  |  /lang model [provider/id|id|default]'
+  'Usage: /lang  (settings menu)  |  /lang check off|on|context (on|off works bare)  |  /lang auto|context|tutor on|off  |  /lang native|learning <code>  |  /lang model [provider/id|id|default]'
 
 const LANGUAGE_PRESETS: ReadonlyArray<{ code: string; name: string }> = [
   { code: 'en', name: 'English' },
@@ -113,6 +120,7 @@ const LANGUAGE_PRESETS: ReadonlyArray<{ code: string; name: string }> = [
 const CUSTOM_LANG = '__custom__'
 
 const LANG_VALUE_COMPLETIONS: Record<string, string[]> = {
+  check: ['off', 'on', 'context'],
   auto: ['on', 'off'],
   context: ['on', 'off'],
   tutor: ['on', 'off'],
@@ -128,17 +136,23 @@ export interface SettingsDeps {
 
 /** Register the /lang command, its settings menu, and the session_start status/warning. */
 export function registerLangSettings(pi: ExtensionAPI, deps: SettingsDeps): void {
-  /** Apply a `check`/`auto`/`context`/`tutor` toggle; shared by the menu and the direct command. */
+  /** Apply the review mode; shared by the menu and the direct command. */
+  const applyCheckMode = (ctx: ExtensionContext, cfg: Config, mode: Config['check']) => {
+    cfg.check = mode
+    if (mode === 'off') deps.disableReview(ctx)
+    if (mode === 'context') warnOnCacheMismatch(ctx, cfg)
+    saveConfig(cfg)
+    updateStatus(ctx, cfg)
+  }
+
+  /** Apply an `auto`/`context`/`tutor` toggle; shared by the menu and the direct command. */
   const applyToggle = (
     ctx: ExtensionContext,
     cfg: Config,
-    key: 'check' | 'auto' | 'context' | 'tutor',
+    key: 'auto' | 'context' | 'tutor',
     on: boolean
   ) => {
-    if (key === 'check') {
-      cfg.enabled = on
-      if (!on) deps.disableReview(ctx)
-    } else if (key === 'tutor') {
+    if (key === 'tutor') {
       cfg.tutor = on
       // The shared widget may be showing a tutor panel right now; clear it.
       if (!on) deps.disableReview(ctx)
@@ -245,10 +259,10 @@ export function registerLangSettings(pi: ExtensionAPI, deps: SettingsDeps): void
         {
           id: 'check',
           label: 'Writing check & tutor',
-          currentValue: cfg.enabled ? 'on' : 'off',
-          values: ['on', 'off'],
+          currentValue: cfg.check,
+          values: ['off', 'on', 'context'],
           description:
-            'Review prompts in your learning language (spelling/grammar) and teach prompts in your native language (words, grammar, whole-sentence expression) while the agent works'
+            'Review learning-language prompts (spelling/grammar) and teach native-language ones (words, grammar, expression) while the agent works — "context" lets the review see the conversation (session terms stop being flagged; costs a cache read per reviewed message)'
         },
         {
           id: 'tutor',
@@ -306,7 +320,9 @@ export function registerLangSettings(pi: ExtensionAPI, deps: SettingsDeps): void
         items.length + 2,
         getSettingsListTheme(),
         (id, newValue) => {
-          if (id === 'check' || id === 'auto' || id === 'context' || id === 'tutor') {
+          if (id === 'check') {
+            applyCheckMode(ctx, cfg, newValue as Config['check'])
+          } else if (id === 'auto' || id === 'context' || id === 'tutor') {
             applyToggle(ctx, cfg, id, newValue === 'on')
           } else if (id === 'native' || id === 'learning') {
             cfg[id] = newValue
@@ -344,9 +360,17 @@ export function registerLangSettings(pi: ExtensionAPI, deps: SettingsDeps): void
         )
         return values.length > 0 ? values.map((v) => ({ value: `${key} ${v}`, label: v })) : null
       }
-      const keys = ['on', 'off', 'auto', 'context', 'tutor', 'native', 'learning', 'model'].filter(
-        (k) => k.startsWith(prefix.trim().toLowerCase())
-      )
+      const keys = [
+        'on',
+        'off',
+        'check',
+        'auto',
+        'context',
+        'tutor',
+        'native',
+        'learning',
+        'model'
+      ].filter((k) => k.startsWith(prefix.trim().toLowerCase()))
       return keys.length > 0
         ? keys.map((k) => ({ value: k === 'on' || k === 'off' ? k : `${k} `, label: k }))
         : null
@@ -357,7 +381,7 @@ export function registerLangSettings(pi: ExtensionAPI, deps: SettingsDeps): void
 
       const show = () =>
         ctx.ui.notify(
-          `learning=${cfg.learning}  native=${cfg.native}  model=${cfg.model ?? 'default (session model)'}  check=${cfg.enabled ? 'on' : 'off'}  tutor=${cfg.tutor ? 'on' : 'off'}  auto=${cfg.auto ? 'on' : 'off'}  context=${cfg.context ? 'on' : 'off'}`,
+          `learning=${cfg.learning}  native=${cfg.native}  model=${cfg.model ?? 'default (session model)'}  check=${cfg.check}  tutor=${cfg.tutor ? 'on' : 'off'}  auto=${cfg.auto ? 'on' : 'off'}  context=${cfg.context ? 'on' : 'off'}`,
           'info'
         )
 
@@ -373,7 +397,14 @@ export function registerLangSettings(pi: ExtensionAPI, deps: SettingsDeps): void
       switch (sub) {
         case 'on':
         case 'off':
-          applyToggle(ctx, cfg, 'check', sub === 'on')
+          applyCheckMode(ctx, cfg, sub)
+          break
+        case 'check':
+          if (value !== 'on' && value !== 'off' && value !== 'context') {
+            ctx.ui.notify('Usage: /lang check off|on|context', 'warning')
+            return
+          }
+          applyCheckMode(ctx, cfg, value)
           break
         case 'auto':
         case 'context':

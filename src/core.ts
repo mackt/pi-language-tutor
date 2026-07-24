@@ -4,16 +4,43 @@
  * plain values (see test.mjs).
  */
 
+/** Review state: disabled, context-free, or forking the session into each review. */
+export type CheckMode = 'off' | 'on' | 'context'
+
 export interface Config {
   learning: string
   native: string
   model?: string
-  enabled: boolean
+  /** Writing check & tutor mode. 'context' costs a session cache read on every reviewed message. */
+  check: CheckMode
   auto: boolean
   /** Fork the main session's context into translation calls (default off: costs cache reads). */
   context: boolean
   /** Teach native-language prompts via the writing tutor (default on; off restores check-only). */
   tutor: boolean
+}
+
+/**
+ * Normalize a stored config object (pure, testable). Accepts the legacy
+ * `enabled: boolean` field from configs written before the writing check
+ * became tri-state.
+ */
+export function normalizeStoredConfig(raw: Partial<Config> & { enabled?: boolean }): Config {
+  const check: CheckMode =
+    raw.check === 'off' || raw.check === 'on' || raw.check === 'context'
+      ? raw.check
+      : raw.enabled === false
+        ? 'off'
+        : 'on'
+  return {
+    learning: typeof raw.learning === 'string' ? raw.learning : 'en',
+    native: typeof raw.native === 'string' ? raw.native : 'zh-CN',
+    model: typeof raw.model === 'string' ? raw.model : undefined,
+    check,
+    auto: raw.auto === true,
+    context: raw.context === true,
+    tutor: raw.tutor !== false
+  }
 }
 
 export interface GrammarItem {
@@ -136,7 +163,10 @@ export function shouldSkipCheck(text: string): boolean {
   return words.length > 0 && codey / words.length > 0.3
 }
 
-export function buildReviewPrompt(text: string, cfg: Config): string {
+export const CHECK_CONTEXT_PREFACE =
+  'The conversation above is the session this message was typed in — treat terms it establishes (project names, identifiers, coined words) as correct vocabulary, not errors, and prefer them when teaching how to express the message.'
+
+export function buildReviewPrompt(text: string, cfg: Config, contextual = false): string {
   const tutorBranch = cfg.tutor
     ? [
         `If the message is NOT primarily written in ${cfg.learning} — e.g. it is in ${cfg.native} or another language (mode "tutor") — the student could not express it in ${cfg.learning}; teach them how:`,
@@ -157,6 +187,7 @@ export function buildReviewPrompt(text: string, cfg: Config): string {
       ]
     : []
   return [
+    ...(contextual ? [CHECK_CONTEXT_PREFACE] : []),
     `You are a ${cfg.learning} language tutor. The student's native language is ${cfg.native}.`,
     `The student typed the following message to an AI coding assistant. Decide which mode applies, then respond accordingly.`,
     ``,

@@ -14,7 +14,7 @@ import { registerTranslation } from './translate.ts'
 
 export default function (pi: ExtensionAPI) {
   const fork = createForkTracker(pi)
-  const review = registerReview(pi)
+  const review = registerReview(pi, fork)
   registerTranslation(pi, fork)
   registerLangSettings(pi, { disableReview: review.disable })
 }

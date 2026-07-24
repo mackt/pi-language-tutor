@@ -12,12 +12,18 @@
 import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-agent'
 import { Container, Text } from '@earendil-works/pi-tui'
 import { loadConfig } from './config.ts'
-import type { Config, GrammarItem } from './core.ts'
+import type { Config, GrammarItem, ReviewResult } from './core.ts'
 import { buildReviewPrompt, parseReviewResult, shouldSkipCheck } from './core.ts'
+import type { ForkContext } from './llm.ts'
 import { resolveModel, runLlm } from './llm.ts'
 import { showTutorWidget } from './tutor.ts'
 
 const WIDGET_KEY = 'language-learn'
+
+export interface ReviewDeps {
+  /** Fork of the main session's last LLM request (see createForkTracker). */
+  makeFork(ctx: ExtensionContext): ForkContext | undefined
+}
 
 function showCheckWidget(
   ctx: ExtensionContext,
@@ -39,7 +45,10 @@ function showCheckWidget(
 }
 
 /** Wire up the review. Returns `disable` for the settings toggle to call. */
-export function registerReview(pi: ExtensionAPI): { disable(ctx: ExtensionContext): void } {
+export function registerReview(
+  pi: ExtensionAPI,
+  deps: ReviewDeps
+): { disable(ctx: ExtensionContext): void } {
   let abort: AbortController | undefined
 
   const runReview = async (
@@ -52,11 +61,33 @@ export function registerReview(pi: ExtensionAPI): { disable(ctx: ExtensionContex
       const model = resolveModel(ctx, cfg)
       if (!model) return
 
-      const raw = await runLlm(ctx, model, buildReviewPrompt(text, cfg), signal)
-      if (signal.aborted || raw === undefined) return
+      const attempt = async (fork?: ForkContext): Promise<ReviewResult | undefined> => {
+        const raw = await runLlm(ctx, model, buildReviewPrompt(text, cfg, !!fork), signal, fork)
+        if (raw === undefined) return undefined
+        const parsed = parseReviewResult(raw)
+        // A forked reply that isn't the review JSON (the replayed agent
+        // prompt won and the model answered as the agent) is a fork failure,
+        // not a clean review; context-free garbage keeps the clear-widget
+        // behavior below.
+        if (parsed === undefined && fork) return undefined
+        return parsed ?? { mode: 'skip' }
+      }
 
-      const result = parseReviewResult(raw)
-      if (!result || result.mode === 'skip') {
+      // Context mode must be strictly additive: a fork replay can fail in
+      // ways a plain request can't (the model answers with a tool call or
+      // as the agent in prose, the provider rejects the replayed prefix),
+      // so on failure retry context-free.
+      const fork = cfg.check === 'context' ? deps.makeFork(ctx) : undefined
+      let result: ReviewResult | undefined
+      try {
+        result = await attempt(fork)
+      } catch (err) {
+        if (!fork || signal.aborted) throw err
+      }
+      if (result === undefined && fork && !signal.aborted) result = await attempt(undefined)
+      if (signal.aborted || result === undefined) return
+
+      if (result.mode === 'skip') {
         ctx.ui.setWidget(WIDGET_KEY, undefined)
         return
       }
@@ -90,7 +121,7 @@ export function registerReview(pi: ExtensionAPI): { disable(ctx: ExtensionContex
     if (!ctx.hasUI || ctx.mode !== 'tui') return
 
     const cfg = loadConfig()
-    if (!cfg.enabled) return
+    if (cfg.check === 'off') return
 
     const text = event.text.trim()
     if (shouldSkipCheck(text)) return

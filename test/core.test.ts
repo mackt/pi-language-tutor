@@ -7,7 +7,9 @@ import {
   cardMarkdown,
   buildSegmentPrompt,
   buildWholeTranslatePrompt,
+  CHECK_CONTEXT_PREFACE,
   CONTEXT_PREFACE,
+  normalizeStoredConfig,
   resolveModelReference,
   resolveStoredModelReference
 } from '../language-learn.ts'
@@ -241,7 +243,7 @@ describe('buildReviewPrompt', () => {
   const cfg = {
     learning: 'en',
     native: 'zh-CN',
-    enabled: true,
+    check: 'on' as const,
     auto: false,
     context: false,
     tutor: true
@@ -286,11 +288,18 @@ describe('prompt builders', () => {
   const cfg = {
     learning: 'en',
     native: 'zh-CN',
-    enabled: true,
+    check: 'on' as const,
     auto: false,
     context: false,
     tutor: true
   }
+
+  it('review prompt has no context preface by default', () => {
+    expect(buildReviewPrompt('some text', cfg)).not.toContain(CHECK_CONTEXT_PREFACE)
+  })
+  it('contextual review prompt starts with the check preface', () => {
+    expect(buildReviewPrompt('some text', cfg, true).startsWith(CHECK_CONTEXT_PREFACE)).toBe(true)
+  })
 
   it('segment prompt numbers segments and pins the count', () => {
     const sp = buildSegmentPrompt(['a', 'b'], cfg)
@@ -508,10 +517,35 @@ const lang = (model?: string, context = false) => ({
   learning: 'en',
   native: 'zh-CN',
   model,
-  enabled: true,
+  check: 'on' as const,
   auto: false,
   context,
   tutor: true
+})
+
+describe('normalizeStoredConfig', () => {
+  it('defaults to check on', () => {
+    expect(normalizeStoredConfig({}).check).toBe('on')
+  })
+  it('migrates legacy enabled: false to check off', () => {
+    expect(normalizeStoredConfig({ enabled: false }).check).toBe('off')
+  })
+  it('migrates legacy enabled: true to check on', () => {
+    expect(normalizeStoredConfig({ enabled: true }).check).toBe('on')
+  })
+  it('keeps an explicit tri-state check value', () => {
+    expect(normalizeStoredConfig({ check: 'context' }).check).toBe('context')
+  })
+  it('an explicit check value wins over a stale legacy enabled flag', () => {
+    expect(normalizeStoredConfig({ check: 'context', enabled: false }).check).toBe('context')
+  })
+  it('rejects an invalid check value back to the default', () => {
+    expect(normalizeStoredConfig({ check: 'sometimes' as never }).check).toBe('on')
+  })
+  it('defaults tutor to on and keeps an explicit tutor: false', () => {
+    expect(normalizeStoredConfig({}).tutor).toBe(true)
+    expect(normalizeStoredConfig({ tutor: false }).tutor).toBe(false)
+  })
 })
 
 describe('resolveModel (pi CLI semantics over available/catalog)', () => {

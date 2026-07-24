@@ -73,18 +73,18 @@ ln -s "$(pwd)/pi-language-tutor" ~/.pi/agent/extensions/pi-language-tutor
 
 在 TUI 中输入 `/lang` 打开交互式设置菜单，也可以用下面的命令直接设置。
 
-| 命令                        | 作用                                               |
-| --------------------------- | -------------------------------------------------- |
-| `/translate` 或 `alt+t`     | 翻译 agent 回复（双语卡片）                        |
-| `/lang`                     | 打开交互式设置菜单，每个选项都有一行说明           |
-| `/lang on` \| `off`         | 恢复/暂停写作检查与写作辅导                        |
-| `/lang tutor on` \| `off`   | 单独开关写作辅导（关闭后母语消息不再显示面板）     |
-| `/lang auto on` \| `off`    | 自动翻译每轮最终回复                               |
-| `/lang native <code>`       | 设置母语，即译文和讲解使用的语言（`zh-CN`、`ja`…） |
-| `/lang learning <code>`     | 设置正在学习的语言（`en`、`fr`…）                  |
-| `/lang model [model]`       | 指定本插件使用的模型                               |
-| `/lang model default`       | 换回会话模型                                       |
-| `/lang context on` \| `off` | 翻译时携带完整会话上下文（默认关闭，详见下文）     |
+| 命令                                   | 作用                                                                                  |
+| -------------------------------------- | ------------------------------------------------------------------------------------- |
+| `/translate` 或 `alt+t`                | 翻译 agent 回复（双语卡片）                                                           |
+| `/lang`                                | 打开交互式设置菜单，每个选项都有一行说明                                              |
+| `/lang check off` \| `on` \| `context` | 检查与辅导的模式——`context` 让检查能看到会话内容（`/lang on`/`off` 仍可作为快捷开关） |
+| `/lang tutor on` \| `off`              | 单独开关写作辅导（关闭后母语消息不再显示面板）                                        |
+| `/lang auto on` \| `off`               | 自动翻译每轮最终回复                                                                  |
+| `/lang native <code>`                  | 设置母语，即译文和讲解使用的语言（`zh-CN`、`ja`…）                                    |
+| `/lang learning <code>`                | 设置正在学习的语言（`en`、`fr`…）                                                     |
+| `/lang model [model]`                  | 指定本插件使用的模型                                                                  |
+| `/lang model default`                  | 换回会话模型                                                                          |
+| `/lang context on` \| `off`            | 翻译时携带完整会话上下文（默认关闭，详见下文）                                        |
 
 ## 配置
 
@@ -95,7 +95,7 @@ ln -s "$(pwd)/pi-language-tutor" ~/.pi/agent/extensions/pi-language-tutor
   "learning": "en",
   "native": "zh-CN",
   "model": "openai/gpt-4o-mini",
-  "enabled": true,
+  "check": "on",
   "auto": false,
   "context": false
 }
@@ -117,6 +117,8 @@ ln -s "$(pwd)/pi-language-tutor" ~/.pi/agent/extensions/pi-language-tutor
 
 - 只有翻译使用**会话模型**时才划算——用 `/lang model` 指定了别的模型就无法命中主会话的缓存，每次翻译都会按全价重新计费整段历史。这也会改变数据的去向：指定其他模型后，发给该服务商的是整段对话，而不只是被翻译的文本。扩展会在启动和切换模型时对这种组合发出提醒；运行 `/lang model default` 即可解决。
 - 会话第一轮 agent 对话之前还没有可复用的请求，此时翻译会静默回退到无上下文模式。
+
+写作检查与辅导有自己独立的上下文档位（`/lang check context`），刻意不与翻译共用开关：检查在你发出的每条消息上都会触发，开启后每次检查都要付一次缓存读取。只有当检查总把项目术语误报成错误时才值得打开——带上下文的检查能认出会话里约定的名称和造词，辅导教你表达时也会优先用它们。
 
 ## 开发
 
