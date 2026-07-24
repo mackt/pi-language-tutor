@@ -3,7 +3,8 @@
  * - src/core.ts      — pure logic (heuristics, prompts, parsing, card assembly)
  * - src/config.ts    — config persistence
  * - src/llm.ts       — model resolution, LLM calls, session-fork tracking
- * - src/grammar.ts   — the "✏ Writing check" widget
+ * - src/grammar.ts   — the unified review: dispatches "✏ Writing check" and "✏ Writing tutor"
+ * - src/tutor.ts     — the "✏ Writing tutor" widget renderer
  * - src/translate.ts — bilingual translation cards
  * - src/settings.ts  — /lang command, settings menu, status bar
  * - src/index.ts     — composition root wiring the features together

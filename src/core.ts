@@ -20,11 +20,35 @@ export interface GrammarItem {
   reason: string
 }
 
-export interface GrammarResult {
-  skip?: boolean
-  items?: GrammarItem[]
-  rephrase?: string | null
+/** A vocabulary item taught by the tutor: the word as used in the sentence + a note in the native language. */
+export interface TutorWord {
+  word: string
+  note: string
 }
+
+/** A grammar structure taught by the tutor: name of the structure + a note in the native language. */
+export interface TutorGrammar {
+  structure: string
+  note: string
+}
+
+/** The tutor payload: a natural rendering of the whole thought, plus the words and grammar worth learning. */
+export interface TutorResult {
+  sentence: string
+  words: TutorWord[]
+  grammar: TutorGrammar[]
+}
+
+/**
+ * One review pass over a prompt. The agent decides the mode:
+ * - `check`: the prompt is in the learning language — review it (existing writing check).
+ * - `tutor`: the prompt is in the native (or another non-learning) language — teach how to say it in the learning language.
+ * - `skip`: neither (too short, code, unclear).
+ */
+export type ReviewResult =
+  | { mode: 'check'; items: GrammarItem[]; rephrase: string | null }
+  | { mode: 'tutor'; tutor: TutorResult }
+  | { mode: 'skip' }
 
 export type Segment =
   | { kind: 'prose'; text: string }
@@ -79,38 +103,63 @@ export function extractJson<T>(raw: string): T | undefined {
 }
 
 // ---------------------------------------------------------------------------
-// Writing check
+// Review (writing check + writing tutor)
 // ---------------------------------------------------------------------------
 
+/**
+ * Should the review be skipped for this prompt? Covers slash/bang commands,
+ * trivially short prompts, code fences, symbol-heavy text, and mostly-code
+ * text. CJK text is NOT penalized for lacking spaces — a CJK sentence is
+ * counted by characters, so a substantial native-language prompt still
+ * reaches the tutor.
+ */
 export function shouldSkipCheck(text: string): boolean {
   if (text.startsWith('/') || text.startsWith('!')) return true
-  if (text.split(/\s+/).filter(Boolean).length < 4) return true
   if (text.includes('```')) return true
 
   const chars = text.replace(/\s+/g, '')
   if (chars.length === 0) return true
+
+  // Content units: whitespace-separated words for Latin scripts, plus CJK
+  // characters counted individually (CJK text is rarely space-separated).
+  // Fewer than 4 units is too short to review or tutor.
+  const words = text.split(/\s+/).filter(Boolean)
+  const cjk = text.match(/[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]/gu)?.length ?? 0
+  if (Math.max(words.length, cjk) < 4) return true
+
   const letters = chars.match(/\p{L}/gu)?.length ?? 0
   if (letters / chars.length < 0.5) return true
 
-  const words = text.split(/\s+/).filter(Boolean)
   const codey = words.filter((w) => /[{}()[\];=<>\\`$]|::|->|\.[a-z]{1,4}$|\//.test(w)).length
-  return codey / words.length > 0.3
+  return words.length > 0 && codey / words.length > 0.3
 }
 
-export function buildGrammarPrompt(text: string, cfg: Config): string {
+export function buildReviewPrompt(text: string, cfg: Config): string {
   return [
-    `You are a ${cfg.learning} writing tutor. The student's native language is ${cfg.native}.`,
-    `The student typed the following message to an AI coding assistant. Check it.`,
+    `You are a ${cfg.learning} language tutor. The student's native language is ${cfg.native}.`,
+    `The student typed the following message to an AI coding assistant. Decide which mode applies, then respond accordingly.`,
     ``,
-    `Respond with ONLY a JSON object, no markdown fences, in one of these forms:`,
-    `- If the message is NOT primarily written in ${cfg.learning}, or there is nothing worth reporting: {"skip": true}`,
-    `- Otherwise: {"skip": false, "items": [{"wrong": "...", "right": "...", "reason": "..."}], "rephrase": "..."}`,
+    `Respond with ONLY a JSON object, no markdown fences:`,
+    ``,
+    `If the message IS primarily written in ${cfg.learning} (mode "check") — review it:`,
+    `  {"mode": "check", "items": [{"wrong": "...", "right": "...", "reason": "..."}], "rephrase": "..." or null}`,
+    `  - "items": genuine spelling/grammar errors only, at most 5. "wrong"/"right" are short exact fragments. "reason" is a very short explanation written in ${cfg.native}.`,
+    `  - "rephrase": only if the message is understandable but sounds noticeably non-native, give ONE more natural way to phrase it in ${cfg.learning}; otherwise null.`,
+    `  - A correct message: {"mode": "check", "items": [], "rephrase": null}.`,
+    ``,
+    `If the message is NOT primarily written in ${cfg.learning} — e.g. it is in ${cfg.native} or another language (mode "tutor") — the student could not express it in ${cfg.learning}; teach them how:`,
+    `  {"mode": "tutor", "sentence": "...", "words": [{"word": "...", "note": "..."}], "grammar": [{"structure": "...", "note": "..."}]}`,
+    `  - "sentence": a natural, idiomatic ${cfg.learning} rendering of the student's WHOLE thought (not a word-by-word gloss).`,
+    `  - "words": the key vocabulary worth learning (at most 5). "word" is the ${cfg.learning} word/phrase exactly as used in "sentence". "note" is a short explanation in ${cfg.native}: meaning, usage, register, and why this word over an obvious synonym.`,
+    `  - "grammar": the grammatical structures carrying the sentence (at most 3). "structure" names the structure (e.g. tense, mood, particle, clause shape, agreement). "note" explains in ${cfg.native} what it is and why it is used here.`,
+    `  - If the message is too short, code, or has no clear meaning to teach, return {"mode": "skip"} instead.`,
+    ``,
+    `If neither mode fits (too short, code, unclear): {"mode": "skip"}`,
     ``,
     `Rules:`,
-    `- "items": genuine spelling/grammar errors only, at most 5. "wrong"/"right" are short exact fragments. "reason" is a very short explanation written in ${cfg.native}.`,
-    `- "rephrase": only if the message is understandable but sounds noticeably non-native, give ONE more natural way to phrase it in ${cfg.learning}; otherwise use null.`,
-    `- Ignore code, file paths, identifiers, product names, and technical jargon.`,
-    `- Do not invent errors. A correct message gets {"skip": false, "items": [], "rephrase": null}.`,
+    `- Ignore code, file paths, identifiers, product names, and technical jargon — do not try to fix or translate them.`,
+    `- A message already correct in ${cfg.learning} is mode "check" with empty items, NOT "tutor".`,
+    `- Never invent errors, never invent vocabulary the student did not express.`,
     ``,
     `Message:`,
     `<<<`,
@@ -119,8 +168,51 @@ export function buildGrammarPrompt(text: string, cfg: Config): string {
   ].join('\n')
 }
 
-export function parseGrammarResult(raw: string): GrammarResult | undefined {
-  return extractJson<GrammarResult>(raw)
+export function parseReviewResult(raw: string): ReviewResult | undefined {
+  const obj = extractJson<{
+    mode?: string
+    skip?: boolean
+    items?: GrammarItem[]
+    rephrase?: string | null
+    sentence?: string
+    words?: TutorWord[]
+    grammar?: TutorGrammar[]
+  }>(raw)
+  if (!obj) return undefined
+
+  if (obj.mode === 'tutor') {
+    const sentence = typeof obj.sentence === 'string' ? obj.sentence.trim() : ''
+    const words = Array.isArray(obj.words)
+      ? obj.words.filter((w) => w && typeof w.word === 'string' && typeof w.note === 'string')
+      : []
+    const grammar = Array.isArray(obj.grammar)
+      ? obj.grammar.filter(
+          (g) => g && typeof g.structure === 'string' && typeof g.note === 'string'
+        )
+      : []
+    if (!sentence && words.length === 0 && grammar.length === 0) return { mode: 'skip' }
+    return {
+      mode: 'tutor',
+      tutor: { sentence, words: words.slice(0, 5), grammar: grammar.slice(0, 3) }
+    }
+  }
+
+  if (obj.mode === 'skip' || obj.skip === true) return { mode: 'skip' }
+
+  // mode "check" (default — also tolerates responses that omit "mode")
+  const items = Array.isArray(obj.items)
+    ? obj.items.filter(
+        (i) =>
+          i &&
+          typeof i.wrong === 'string' &&
+          i.wrong.trim().length > 0 &&
+          typeof i.right === 'string' &&
+          i.right.trim().length > 0
+      )
+    : []
+  const rephrase =
+    typeof obj.rephrase === 'string' && obj.rephrase.trim().length > 0 ? obj.rephrase.trim() : null
+  return { mode: 'check', items: items.slice(0, 5), rephrase }
 }
 
 // ---------------------------------------------------------------------------

@@ -121,8 +121,8 @@ const LANG_VALUE_COMPLETIONS: Record<string, string[]> = {
 }
 
 export interface SettingsDeps {
-  /** Abort any in-flight writing check and hide its widget (check turned off). */
-  disableGrammar(ctx: ExtensionContext): void
+  /** Abort any in-flight review and hide its widget (check/tutor turned off). */
+  disableReview(ctx: ExtensionContext): void
 }
 
 /** Register the /lang command, its settings menu, and the session_start status/warning. */
@@ -136,7 +136,7 @@ export function registerLangSettings(pi: ExtensionAPI, deps: SettingsDeps): void
   ) => {
     if (key === 'check') {
       cfg.enabled = on
-      if (!on) deps.disableGrammar(ctx)
+      if (!on) deps.disableReview(ctx)
     } else if (key === 'auto') {
       cfg.auto = on
       if (on && !cfg.model) {
@@ -239,10 +239,11 @@ export function registerLangSettings(pi: ExtensionAPI, deps: SettingsDeps): void
       const items: SettingItem[] = [
         {
           id: 'check',
-          label: 'Writing check',
+          label: 'Writing check & tutor',
           currentValue: cfg.enabled ? 'on' : 'off',
           values: ['on', 'off'],
-          description: 'Review your prompts for spelling and grammar while the agent works'
+          description:
+            'Review prompts in your learning language (spelling/grammar) and teach prompts in your native language (words, grammar, whole-sentence expression) while the agent works'
         },
         {
           id: 'auto',

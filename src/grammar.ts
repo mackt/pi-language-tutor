@@ -1,19 +1,25 @@
 /**
- * Writing check: watches interactive input and renders the "✏ Writing check"
- * widget above the editor. Non-blocking by design — the message reaches the
- * agent immediately and a failed check never disturbs the session.
+ * Review: watches interactive input and renders either the "✏ Writing check"
+ * widget (the prompt is in the learning language — fix mistakes) or the
+ * "✏ Writing tutor" widget (the prompt is in the native language — teach the
+ * words, grammar, and whole-sentence expression). A single LLM call decides
+ * the mode, so the two are complementary and never both fire.
+ *
+ * Non-blocking by design — the message reaches the agent immediately and a
+ * failed review never disturbs the session.
  */
 
 import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-agent'
 import { Container, Text } from '@earendil-works/pi-tui'
 import { loadConfig } from './config.ts'
 import type { Config, GrammarItem } from './core.ts'
-import { buildGrammarPrompt, parseGrammarResult, shouldSkipCheck } from './core.ts'
+import { buildReviewPrompt, parseReviewResult, shouldSkipCheck } from './core.ts'
 import { resolveModel, runLlm } from './llm.ts'
+import { showTutorWidget } from './tutor.ts'
 
 const WIDGET_KEY = 'language-learn'
 
-function showWidget(
+function showCheckWidget(
   ctx: ExtensionContext,
   items: GrammarItem[],
   rephrase: string | undefined
@@ -32,11 +38,11 @@ function showWidget(
   })
 }
 
-/** Wire up the writing check. Returns `disable` for the settings toggle to call. */
-export function registerGrammarCheck(pi: ExtensionAPI): { disable(ctx: ExtensionContext): void } {
+/** Wire up the review. Returns `disable` for the settings toggle to call. */
+export function registerReview(pi: ExtensionAPI): { disable(ctx: ExtensionContext): void } {
   let abort: AbortController | undefined
 
-  const runCheck = async (
+  const runReview = async (
     text: string,
     cfg: Config,
     ctx: ExtensionContext,
@@ -46,23 +52,30 @@ export function registerGrammarCheck(pi: ExtensionAPI): { disable(ctx: Extension
       const model = resolveModel(ctx, cfg)
       if (!model) return
 
-      const raw = await runLlm(ctx, model, buildGrammarPrompt(text, cfg), signal)
+      const raw = await runLlm(ctx, model, buildReviewPrompt(text, cfg), signal)
       if (signal.aborted || raw === undefined) return
 
-      const result = parseGrammarResult(raw)
-      const items = result?.skip ? [] : (result?.items ?? []).filter((i) => i && i.wrong && i.right)
-      const rephrase =
-        !result?.skip && typeof result?.rephrase === 'string' && result.rephrase.trim().length > 0
-          ? result.rephrase.trim()
-          : undefined
+      const result = parseReviewResult(raw)
+      if (!result || result.mode === 'skip') {
+        ctx.ui.setWidget(WIDGET_KEY, undefined)
+        return
+      }
 
+      if (result.mode === 'tutor') {
+        showTutorWidget(ctx, result.tutor)
+        return
+      }
+
+      // check
+      const items = result.items
+      const rephrase = result.rephrase ?? undefined
       if (items.length === 0 && !rephrase) {
         ctx.ui.setWidget(WIDGET_KEY, undefined)
       } else {
-        showWidget(ctx, items.slice(0, 5), rephrase)
+        showCheckWidget(ctx, items, rephrase)
       }
     } catch {
-      // silent by design: a failed check must never disturb the session
+      // silent by design: a failed review must never disturb the session
     }
   }
 
@@ -79,7 +92,7 @@ export function registerGrammarCheck(pi: ExtensionAPI): { disable(ctx: Extension
     abort?.abort()
     abort = new AbortController()
     // Fire and forget: the message continues to the agent immediately.
-    void runCheck(text, cfg, ctx, abort.signal)
+    void runReview(text, cfg, ctx, abort.signal)
   })
 
   return {

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   shouldSkipCheck,
-  parseGrammarResult,
+  parseReviewResult,
+  buildReviewPrompt,
   segmentMarkdown,
   cardMarkdown,
   buildSegmentPrompt,
@@ -45,8 +46,11 @@ describe('shouldSkipCheck', () => {
     it('mostly code tokens', () => {
       expect(shouldSkipCheck('const x = foo(bar); y->z; a[i] = {b: 1};')).toBe(true)
     })
-    it('mostly CJK when learning en (<4 whitespace words)', () => {
-      expect(shouldSkipCheck('请帮我修复这个程序里的错误谢谢')).toBe(true)
+    it('short CJK prompt (<4 chars): skipped', () => {
+      expect(shouldSkipCheck('你好吗')).toBe(true)
+    })
+    it('substantial CJK prompt is NOT skipped (reaches the tutor)', () => {
+      expect(shouldSkipCheck('请帮我修复这个程序里的错误谢谢')).toBe(false)
     })
     it('symbols only', () => {
       expect(shouldSkipCheck('=== !== >>> <<< &&& ||| ??? *** !!!')).toBe(true)
@@ -71,28 +75,89 @@ describe('shouldSkipCheck', () => {
   })
 })
 
-describe('parseGrammarResult', () => {
-  it('clean json', () => {
+describe('parseReviewResult', () => {
+  it('check mode: clean json', () => {
     expect(
-      parseGrammarResult(
-        '{"skip": false, "items": [{"wrong":"a","right":"b","reason":"c"}], "rephrase": null}'
+      parseReviewResult(
+        '{"mode": "check", "items": [{"wrong":"a","right":"b","reason":"c"}], "rephrase": null}'
       )
-    ).toEqual({ skip: false, items: [{ wrong: 'a', right: 'b', reason: 'c' }], rephrase: null })
+    ).toEqual({
+      mode: 'check',
+      items: [{ wrong: 'a', right: 'b', reason: 'c' }],
+      rephrase: null
+    })
+  })
+  it('check mode: tolerates a missing "mode" (backward-compatible shape)', () => {
+    expect(parseReviewResult('{"items": [], "rephrase": null}')).toEqual({
+      mode: 'check',
+      items: [],
+      rephrase: null
+    })
+  })
+  it('check mode: trims rephrase and drops empty items', () => {
+    expect(
+      parseReviewResult(
+        '{"mode": "check", "items": [{"wrong": "", "right": "", "reason": ""}], "rephrase": "  "}'
+      )
+    ).toEqual({ mode: 'check', items: [], rephrase: null })
+  })
+  it('tutor mode: parses sentence, words, grammar', () => {
+    expect(
+      parseReviewResult(
+        '{"mode": "tutor", "sentence": "I want to refactor this function.", "words": [{"word": "refactor", "note": "重构"}], "grammar": [{"structure": "want to + infinitive", "note": "表示想要做某事"}]}'
+      )
+    ).toEqual({
+      mode: 'tutor',
+      tutor: {
+        sentence: 'I want to refactor this function.',
+        words: [{ word: 'refactor', note: '重构' }],
+        grammar: [{ structure: 'want to + infinitive', note: '表示想要做某事' }]
+      }
+    })
+  })
+  it('tutor mode: caps words at 5 and grammar at 3', () => {
+    const raw = JSON.stringify({
+      mode: 'tutor',
+      sentence: 'x',
+      words: Array.from({ length: 8 }, (_, i) => ({ word: `w${i}`, note: 'n' })),
+      grammar: Array.from({ length: 5 }, (_, i) => ({ structure: `g${i}`, note: 'n' }))
+    })
+    const r = parseReviewResult(raw)
+    expect(r).toEqual({
+      mode: 'tutor',
+      tutor: {
+        sentence: 'x',
+        words: Array.from({ length: 5 }, (_, i) => ({ word: `w${i}`, note: 'n' })),
+        grammar: Array.from({ length: 3 }, (_, i) => ({ structure: `g${i}`, note: 'n' }))
+      }
+    })
+  })
+  it('tutor mode with no teachable content degrades to skip', () => {
+    expect(
+      parseReviewResult('{"mode": "tutor", "sentence": "", "words": [], "grammar": []}')
+    ).toEqual({ mode: 'skip' })
+  })
+  it('skip mode', () => {
+    expect(parseReviewResult('{"mode": "skip"}')).toEqual({ mode: 'skip' })
+  })
+  it('legacy {"skip": true} (old writing-check shape) maps to skip', () => {
+    expect(parseReviewResult('{"skip": true}')).toEqual({ mode: 'skip' })
   })
   it('fenced json', () => {
-    expect(parseGrammarResult('```json\n{"skip": true}\n```')).toEqual({ skip: true })
+    expect(parseReviewResult('```json\n{"mode": "skip"}\n```')).toEqual({ mode: 'skip' })
   })
   it('json with preamble', () => {
-    expect(parseGrammarResult('Here is the result:\n{"skip": false, "items": []}')).toEqual({
-      skip: false,
-      items: []
+    expect(parseReviewResult('Here is the result:\n{"mode": "check", "items": []}')).toEqual({
+      mode: 'check',
+      items: [],
+      rephrase: null
     })
   })
   it('garbage', () => {
-    expect(parseGrammarResult('I cannot help with that')).toBeUndefined()
+    expect(parseReviewResult('I cannot help with that')).toBeUndefined()
   })
   it('truncated json', () => {
-    expect(parseGrammarResult('{"skip": false, "items": [{"wrong": "a"')).toBeUndefined()
+    expect(parseReviewResult('{"mode": "check", "items": [{"wrong": "a"')).toBeUndefined()
   })
 })
 
@@ -169,6 +234,26 @@ describe('cardMarkdown', () => {
   })
   it('replaces long code with a placeholder', () => {
     expect(card).toContain('*[code block ↑ 23 lines]*')
+  })
+})
+
+describe('buildReviewPrompt', () => {
+  const cfg = { learning: 'en', native: 'zh-CN', enabled: true, auto: false, context: false }
+  const prompt = buildReviewPrompt('some prompt', cfg)
+  it('mentions both modes and the learning language', () => {
+    expect(prompt).toContain('mode "check"')
+    expect(prompt).toContain('mode "tutor"')
+    expect(prompt).toContain('{"mode": "skip"}')
+    expect(prompt).toContain(cfg.learning)
+  })
+  it('wraps the message in <<< >>> delimiters', () => {
+    expect(prompt).toContain('<<<\nsome prompt\n>>>')
+  })
+  it('asks the tutor to teach words, grammar, and the whole sentence in the native language', () => {
+    expect(prompt).toContain('"sentence"')
+    expect(prompt).toContain('"words"')
+    expect(prompt).toContain('"grammar"')
+    expect(prompt).toContain(cfg.native)
   })
 })
 
