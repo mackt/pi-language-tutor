@@ -1,5 +1,11 @@
 # pi-language-tutor
 
+[![npm](https://img.shields.io/npm/v/pi-language-tutor)](https://www.npmjs.com/package/pi-language-tutor)
+[![CI](https://img.shields.io/github/actions/workflow/status/mackt/pi-language-tutor/ci.yml?branch=main&label=CI)](https://github.com/mackt/pi-language-tutor/actions/workflows/ci.yml)
+[![license](https://img.shields.io/npm/l/pi-language-tutor)](https://github.com/mackt/pi-language-tutor/blob/main/LICENSE)
+[![downloads](https://img.shields.io/npm/dw/pi-language-tutor)](https://www.npmjs.com/package/pi-language-tutor)
+[![stars](https://img.shields.io/github/stars/mackt/pi-language-tutor)](https://github.com/mackt/pi-language-tutor)
+
 English | [简体中文](README.zh-CN.md)
 
 Learn a foreign language while you code. A [pi](https://pi.dev) extension that reviews your prompts for spelling, grammar, and natural phrasing — with explanations in your native language — teaches you how to express thoughts you couldn't yet say in the learning language, and renders agent replies as bilingual immersive translations.
