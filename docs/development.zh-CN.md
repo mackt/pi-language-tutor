@@ -47,7 +47,7 @@ npm run fmt:check  # 格式检查（CI）
 | --- | --- |
 | `docs/writing-check.png` | 真实终端截图 |
 | `docs/bilingual-card.png` | 真实终端截图 |
-| `docs/writing-tutor.png` | 产品风格 mock（源文件 `docs/_shots/writing-tutor.html`），有真机截图后可替换 |
+| `docs/writing-tutor.png` | 真机截图（`docs/_shots/writing-tutor.html` 仍保留作备用模板） |
 | `docs/demo.gif` | 三块面板轮播，供 README 门面使用 |
 | `docs/logo.png` | 256×256，README 标题用 |
 | `docs/icon.png` | 完整 app icon 源图 |

@@ -47,7 +47,7 @@ Feature modules keep one-way dependencies; new logic that does not need pi APIs 
 | --- | --- |
 | `docs/writing-check.png` | Real terminal capture |
 | `docs/bilingual-card.png` | Real terminal capture |
-| `docs/writing-tutor.png` | Product-style mock (HTML in `docs/_shots/writing-tutor.html`) until a real capture is swapped in |
+| `docs/writing-tutor.png` | Real terminal capture (HTML mock in `docs/_shots/writing-tutor.html` kept as a fallback template) |
 | `docs/demo.gif` | Slideshow of the three panels for the README hero |
 | `docs/logo.png` | 256×256 logo for README header |
 | `docs/icon.png` | Full app icon source |
