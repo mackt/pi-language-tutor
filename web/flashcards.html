@@ -11,6 +11,18 @@
         --dim: #737373;
         --faint: #404040;
         --line: #262626;
+        --scrim: rgba(10, 10, 10, 0.88);
+        color-scheme: light dark;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #ffffff;
+          --text: #1a1a1a;
+          --dim: #6b7280;
+          --faint: #d4d4d4;
+          --line: #e5e5e5;
+          --scrim: rgba(255, 255, 255, 0.88);
+        }
       }
       * {
         margin: 0;
@@ -243,7 +255,7 @@
         cursor: pointer;
       }
       .lib-row:hover .lib-word {
-        color: #fff;
+        color: var(--text);
       }
 
       /* ---- Help overlay ---- */
@@ -277,7 +289,7 @@
       .overlay {
         position: fixed;
         inset: 0;
-        background: rgba(10, 10, 10, 0.88);
+        background: var(--scrim);
         display: none;
         align-items: center;
         justify-content: center;
