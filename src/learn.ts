@@ -51,6 +51,7 @@ interface OverviewPayload {
   newCards: number
   lastReview: string | null
   nextDue: string | null
+  theme: FlashcardSettings['theme']
   cards: CardSummary[]
 }
 
@@ -68,25 +69,27 @@ type HostMessage = OverviewPayload | CardPayload | SettingsPayload
 
 type WindowMessage =
   | { type: 'ready' }
+  | { type: 'overview' }
   | { type: 'start' }
   | { type: 'settings' }
   | { type: 'saveSettings'; settings: unknown }
+  | { type: 'saveTheme'; theme: unknown }
   | { type: 'edit'; id: string; word: string; note: string }
   | { type: 'delete'; id: string }
-  | { type: 'undo' }
   | { type: 'rate'; id: string; rating: Grade }
 
 function parseMessage(value: unknown): WindowMessage | null {
   if (typeof value !== 'object' || value === null) return null
   const v = value as Record<string, unknown>
   if (v.type === 'ready') return { type: 'ready' }
+  if (v.type === 'overview') return { type: 'overview' }
   if (v.type === 'start') return { type: 'start' }
   if (v.type === 'settings') return { type: 'settings' }
-  if (v.type === 'undo') return { type: 'undo' }
   if (v.type === 'saveSettings') {
     if (typeof v.settings !== 'object' || v.settings === null) return null
     return { type: 'saveSettings', settings: v.settings }
   }
+  if (v.type === 'saveTheme') return { type: 'saveTheme', theme: v.theme }
   if (v.type === 'edit') {
     if (typeof v.id !== 'string' || typeof v.word !== 'string' || typeof v.note !== 'string')
       return null
@@ -111,12 +114,6 @@ export function registerLearn(pi: ExtensionAPI): void {
   let cards: FlashcardEntry[] = []
   let queue: FlashcardEntry[] = []
   let settings: FlashcardSettings = loadSettings()
-  // Snapshot of the last rated card for single-level undo.
-  let lastRating: {
-    card: FlashcardEntry
-    fsrsState: FlashcardEntry['fsrs']
-    introducedAt?: string
-  } | null = null
 
   const send = (msg: HostMessage): void => {
     if (!window) return
@@ -129,7 +126,7 @@ export function registerLearn(pi: ExtensionAPI): void {
   }
 
   const sendOverview = (): void => {
-    send({ type: 'overview', ...cardStats(cards, settings), cards: listCards(cards) })
+    send({ type: 'overview', ...cardStats(cards, settings), theme: settings.theme, cards: listCards(cards) })
   }
 
   /** Persist, merging with whatever landed on disk since we loaded. */
@@ -162,6 +159,11 @@ export function registerLearn(pi: ExtensionAPI): void {
         sendOverview()
         return
 
+      // Page re-entered the main view mid-session: push fresh stats/list.
+      case 'overview':
+        sendOverview()
+        return
+
       case 'start':
         // Queue drained (e.g. session limit hit) but more cards due: deal a
         // fresh session so Enter keeps reviewing without reopening /flashcards.
@@ -183,6 +185,11 @@ export function registerLearn(pi: ExtensionAPI): void {
         sendOverview()
         return
 
+      case 'saveTheme':
+        settings = clampSettings({ ...settings, theme: msg.theme })
+        saveSettings(settings)
+        return
+
       case 'edit': {
         const target = cards.find((c) => c.id === msg.id)
         if (!target || !updateCard(target, msg.word, msg.note)) return
@@ -201,32 +208,12 @@ export function registerLearn(pi: ExtensionAPI): void {
         return
       }
 
-      case 'undo': {
-        if (!lastRating) return
-        const { card, fsrsState, introducedAt } = lastRating
-        card.fsrs = fsrsState
-        card.introducedAt = introducedAt
-        // Bring the card back to the front of the queue
-        const idx = queue.findIndex((c) => c.id === card.id)
-        if (idx >= 0) queue.splice(idx, 1)
-        queue.unshift(card)
-        lastRating = null
-        persist()
-        sendNext()
-        return
-      }
-
       case 'rate': {
         // Only accept a rating for the card currently shown, so a
         // stale/duplicate keypress can't rate the next, unseen card.
         const head = queue[0]
         if (!head || head.id !== msg.id) return
 
-        lastRating = {
-          card: head,
-          fsrsState: structuredClone(head.fsrs),
-          introducedAt: head.introducedAt
-        }
         rateCard(head, msg.rating)
         queue.shift()
         // Again/Hard = not learned yet: re-queue at the end for another pass

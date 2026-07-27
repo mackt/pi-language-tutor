@@ -180,9 +180,12 @@ describe('clampSettings', () => {
     expect(clampSettings({ newPerDay: -5, sessionLimit: 9999, requestRetention: 0.5 })).toEqual({
       newPerDay: 0,
       sessionLimit: 200,
-      requestRetention: 0.7
+      requestRetention: 0.7,
+      theme: 'system'
     })
     expect(clampSettings({ requestRetention: 0.99 }).requestRetention).toBe(0.97)
+    expect(clampSettings({ theme: 'neon' }).theme).toBe('system')
+    expect(clampSettings({ theme: 'dark' }).theme).toBe('dark')
   })
 })
 

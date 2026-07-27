@@ -9,6 +9,8 @@ import * as path from 'node:path'
 
 const SETTINGS_PATH = path.join(os.homedir(), '.pi', 'agent', 'flashcards-settings.json')
 
+export type FlashcardTheme = 'system' | 'light' | 'dark'
+
 export interface FlashcardSettings {
   /** New cards introduced per day (Anki-style daily limit). */
   newPerDay: number
@@ -16,12 +18,15 @@ export interface FlashcardSettings {
   sessionLimit: number
   /** FSRS desired retention — higher means shorter intervals. Not exposed in the UI. */
   requestRetention: number
+  /** Color scheme of the review window. */
+  theme: FlashcardTheme
 }
 
 export const DEFAULT_SETTINGS: FlashcardSettings = {
   newPerDay: 20,
   sessionLimit: 20,
-  requestRetention: 0.9
+  requestRetention: 0.9,
+  theme: 'system'
 }
 
 const numOr = (v: unknown, fallback: number): number =>
@@ -40,7 +45,8 @@ export function clampSettings(raw: unknown): FlashcardSettings {
     requestRetention:
       Math.round(
         clampNum(numOr(r.requestRetention, DEFAULT_SETTINGS.requestRetention), 0.7, 0.97) * 100
-      ) / 100
+      ) / 100,
+    theme: r.theme === 'light' || r.theme === 'dark' ? r.theme : 'system'
   }
 }
 

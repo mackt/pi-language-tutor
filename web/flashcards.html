@@ -15,14 +15,27 @@
         color-scheme: light dark;
       }
       @media (prefers-color-scheme: light) {
-        :root {
+        :root:not([data-theme="dark"]) {
           --bg: #ffffff;
           --text: #1a1a1a;
           --dim: #6b7280;
           --faint: #d4d4d4;
           --line: #e5e5e5;
           --scrim: rgba(255, 255, 255, 0.88);
+          color-scheme: light;
         }
+      }
+      :root[data-theme="light"] {
+        --bg: #ffffff;
+        --text: #1a1a1a;
+        --dim: #6b7280;
+        --faint: #d4d4d4;
+        --line: #e5e5e5;
+        --scrim: rgba(255, 255, 255, 0.88);
+        color-scheme: light;
+      }
+      :root[data-theme="dark"] {
+        color-scheme: dark;
       }
       * {
         margin: 0;
@@ -205,7 +218,7 @@
       }
       #edit-link {
         position: absolute;
-        top: 14px;
+        top: 44px;
         right: 16px;
         cursor: pointer;
       }
@@ -242,15 +255,6 @@
       #edit-delete:hover {
         color: var(--text);
       }
-      #undo-link {
-        position: absolute;
-        top: 14px;
-        right: 52px;
-        cursor: pointer;
-      }
-      #undo-link:hover {
-        color: var(--dim);
-      }
       .lib-row {
         cursor: pointer;
       }
@@ -259,30 +263,25 @@
       }
 
       /* ---- Help overlay ---- */
-      .corner-btn {
+      .corner-group {
         position: fixed;
-        bottom: 12px;
-        width: 26px;
-        height: 26px;
-        border-radius: 50%;
-        border: 1px solid var(--line);
+        top: 12px;
+        right: 14px;
+        display: flex;
+        gap: 8px;
+      }
+      .corner-btn {
+        padding: 2px 8px;
+        border: none;
+        border-radius: 10px;
         background: transparent;
         color: var(--faint);
-        font-size: 0.8rem;
+        font-size: 0.75rem;
         cursor: pointer;
-        transition:
-          border-color 0.15s,
-          color 0.15s;
+        transition: color 0.15s;
       }
       .corner-btn:hover {
-        border-color: var(--dim);
         color: var(--dim);
-      }
-      #help-btn {
-        right: 14px;
-      }
-      #settings-btn {
-        right: 48px;
       }
 
       /* Overlays: transient layers (help, settings) above the views */
@@ -298,10 +297,19 @@
       .overlay.visible {
         display: flex;
       }
+      .overlay-header {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .overlay-title {
+        font-size: 0.85rem;
+        color: var(--dim);
+      }
       .overlay-close {
         position: absolute;
-        top: 14px;
-        right: 18px;
+        right: 0;
         font-size: 1.1rem;
         line-height: 1;
         color: var(--faint);
@@ -316,6 +324,10 @@
         flex-direction: column;
         gap: 0.9rem;
         cursor: default;
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 1.5rem 1.75rem;
       }
       .help-row {
         display: flex;
@@ -384,7 +396,6 @@
     <!-- Review -->
     <div id="review" class="view">
       <div class="hint back-link" id="back-link">← back</div>
-      <div class="hint" id="undo-link">undo</div>
       <div class="hint" id="edit-link">edit</div>
       <div id="card">
         <div id="word"></div>
@@ -400,23 +411,25 @@
     </div>
 
     <!-- Corner buttons open transient overlays -->
-    <button id="help-btn" class="corner-btn" aria-label="keyboard shortcuts">?</button>
-    <button id="settings-btn" class="corner-btn" aria-label="settings">⚙︎</button>
+    <div class="corner-group">
+      <button id="theme-btn" class="corner-btn">system</button>
+      <button id="help-btn" class="corner-btn">shortcuts</button>
+      <button id="settings-btn" class="corner-btn">settings</button>
+    </div>
 
     <div id="help-overlay" class="overlay">
-      <span class="overlay-close">×</span>
       <div id="help-card" class="overlay-card">
+        <div class="overlay-header"><span class="overlay-title">shortcuts</span><span class="overlay-close">×</span></div>
         <div class="help-row"><kbd>space</kbd><span>flip card</span></div>
         <div class="help-row"><kbd>1–4</kbd><span>rate again / hard / good / easy</span></div>
-        <div class="help-row"><kbd>u</kbd><span>undo last rating</span></div>
         <div class="help-row"><kbd>enter</kbd><span>study now</span></div>
         <div class="help-row"><kbd>esc</kbd><span>back / close</span></div>
       </div>
     </div>
 
     <div id="settings-overlay" class="overlay">
-      <span class="overlay-close">×</span>
       <div id="settings-card" class="overlay-card">
+        <div class="overlay-header"><span class="overlay-title">settings</span><span class="overlay-close">×</span></div>
         <div class="set-row">
           <span class="set-label">new cards per day</span>
           <span><input class="set-input" id="input-newPerDay" inputmode="numeric" /></span>
@@ -429,8 +442,8 @@
     </div>
 
     <div id="edit-overlay" class="overlay">
-      <span class="overlay-close">×</span>
       <div id="edit-card" class="overlay-card">
+        <div class="overlay-header"><span class="overlay-title">edit card</span><span class="overlay-close">×</span></div>
         <input class="edit-field" id="edit-word" placeholder="word" />
         <textarea class="edit-field" id="edit-note" rows="3" placeholder="note"></textarea>
         <div class="edit-actions">
@@ -445,7 +458,6 @@
       let cardId = ''
       let due = 0
       let view = 'main'
-      let lastOverview = null
       let settings = null
       let editingId = ''
 
@@ -483,12 +495,12 @@
       }
 
       function renderOverview(msg) {
+        applyTheme(msg.theme)
         updateOverview(msg)
         show('#main')
       }
 
       function updateOverview(msg) {
-        lastOverview = msg
         due = msg.due
         $('#due-num').textContent = due
         $('#due-label').textContent =
@@ -649,10 +661,27 @@
         toggleOverlay('#edit-overlay', false)
       }
 
+      // Theme: system (default) → light → dark, persisted by the host in flashcards-settings.json
+      const themeBtn = $('#theme-btn')
+      let themeMode = 'system'
+      function applyTheme(mode) {
+        themeMode = ['system', 'light', 'dark'].includes(mode) ? mode : 'system'
+        if (themeMode === 'system') delete document.documentElement.dataset.theme
+        else document.documentElement.dataset.theme = themeMode
+        themeBtn.textContent = themeMode
+      }
+      themeBtn.addEventListener('click', () => {
+        const next = themeMode === 'system' ? 'light' : themeMode === 'light' ? 'dark' : 'system'
+        applyTheme(next)
+        window.glimpse.send({ type: 'saveTheme', theme: themeMode })
+      })
+      applyTheme('system')
+
       $('#show-answer').addEventListener('click', flip)
       $('#begin-btn').addEventListener('click', start)
       $('#back-link').addEventListener('click', () => {
-        if (lastOverview) renderOverview(lastOverview)
+        show('#main') // instant; fresh stats arrive via the overview response
+        window.glimpse.send({ type: 'overview' })
       })
       $('#edit-link').addEventListener('click', () => {
         if (view !== 'review' || !cardId) return
@@ -660,7 +689,6 @@
       })
       $('#edit-save').addEventListener('click', saveEdit)
       $('#edit-delete').addEventListener('click', deleteEdit)
-      $('#undo-link').addEventListener('click', () => window.glimpse.send({ type: 'undo' }))
       $('#edit-overlay').addEventListener('click', (e) => {
         if (e.target === e.currentTarget) toggleOverlay('#edit-overlay', false)
       })
@@ -702,13 +730,14 @@
         if (e.key === 'Escape') {
           if (overlayOpen()) closeOverlays()
           // Review → back to main (session resumes on Enter); main → close.
-          else if (view === 'review' && lastOverview) renderOverview(lastOverview)
+          else if (view === 'review') {
+            show('#main')
+            window.glimpse.send({ type: 'overview' })
+          }
           else window.glimpse.close()
         } else if (e.key === '?' || e.key === '？') {
           // '？' covers full-width input methods
           toggleHelp()
-        } else if (e.key === 'u' || e.key === 'U') {
-          if (view === 'review') window.glimpse.send({ type: 'undo' })
         } else if (e.key === 'Enter') {
           e.preventDefault()
           start()
