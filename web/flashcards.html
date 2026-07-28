@@ -457,6 +457,7 @@
       let flipped = false
       let cardId = ''
       let due = 0
+      let pending = 0
       let view = 'main'
       let settings = null
       let editingId = ''
@@ -502,9 +503,10 @@
 
       function updateOverview(msg) {
         due = msg.due
+        pending = msg.pending || 0
         $('#due-num').textContent = due
         $('#due-label').textContent =
-          due === 0 ? 'all caught up' : due === 1 ? 'card due' : 'cards due'
+          due === 0 ? (pending > 0 ? pending + ' left in round' : 'all caught up') : due === 1 ? 'card due' : 'cards due'
         const parts = [msg.total + ' total']
         if (msg.newCards > 0) parts.push(msg.newCards + ' new')
         parts.push('last review ' + ago(msg.lastReview))
@@ -533,7 +535,7 @@
         }
         list.style.display = msg.cards.length > 0 ? '' : 'none'
         $('#empty-note').style.display = msg.cards.length > 0 ? 'none' : 'flex'
-        $('#begin-btn').style.visibility = due > 0 ? 'visible' : 'hidden'
+        $('#begin-btn').style.visibility = due + pending > 0 ? 'visible' : 'hidden'
       }
 
       function renderCard(msg) {
@@ -629,7 +631,8 @@
       }
 
       function start() {
-        if (due <= 0 || view !== 'main') return
+        // Host may still hold Again/Hard retries even when nothing is due.
+        if (due + pending <= 0 || view !== 'main') return
         window.glimpse.send({ type: 'start' })
       }
 

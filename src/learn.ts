@@ -51,6 +51,8 @@ interface OverviewPayload {
   newCards: number
   lastReview: string | null
   nextDue: string | null
+  /** Cards still queued for another pass this round (Again/Hard retries). */
+  pending: number
   theme: FlashcardSettings['theme']
   cards: CardSummary[]
 }
@@ -113,6 +115,9 @@ export function registerLearn(pi: ExtensionAPI): void {
   // Full card list plus the review queue (references into `cards`).
   let cards: FlashcardEntry[] = []
   let queue: FlashcardEntry[] = []
+  // Ids explicitly deleted this session: tombstones so persist() can tell
+  // "deleted here" apart from "captured on disk while the window was open".
+  const deleted = new Set<string>()
   let settings: FlashcardSettings = loadSettings()
 
   const send = (msg: HostMessage): void => {
@@ -126,12 +131,12 @@ export function registerLearn(pi: ExtensionAPI): void {
   }
 
   const sendOverview = (): void => {
-    send({ type: 'overview', ...cardStats(cards, settings), theme: settings.theme, cards: listCards(cards) })
+    send({ type: 'overview', ...cardStats(cards, settings), pending: queue.length, theme: settings.theme, cards: listCards(cards) })
   }
 
   /** Persist, merging with whatever landed on disk since we loaded. */
   const persist = (): void => {
-    saveCards(mergeCards(loadCards(), cards))
+    saveCards(mergeCards(loadCards(), cards).filter((c) => !deleted.has(c.id)))
   }
 
   const sendNext = (): void => {
@@ -203,6 +208,7 @@ export function registerLearn(pi: ExtensionAPI): void {
         const qIdx = queue.findIndex((c) => c.id === msg.id)
         if (qIdx >= 0) queue.splice(qIdx, 1)
         if (!deleteCard(cards, msg.id)) return
+        deleted.add(msg.id)
         persist()
         refreshAfter(wasHead)
         return
@@ -240,6 +246,7 @@ export function registerLearn(pi: ExtensionAPI): void {
 
     cards = loadCards()
     queue = []
+    deleted.clear()
 
     // glimpseui spawns the native window with stderr hardcoded to inherit,
     // so macOS IMK framework noise (TSM/IMKCFRunLoop logs) leaks into pi's
