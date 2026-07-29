@@ -84,7 +84,7 @@ ln -s "$(pwd)/pi-language-tutor" ~/.pi/agent/extensions/pi-language-tutor
 | 命令                                   | 作用                                                                                  |
 | -------------------------------------- | ------------------------------------------------------------------------------------- |
 | `/translate` 或 `alt+t`                | 翻译 agent 回复（双语卡片）                                                           |
-| `/flashcards`                               | 复习写作辅导自动捕获的记忆卡片                                                        |
+| `/flashcards`                          | 复习写作辅导自动捕获的记忆卡片                                                        |
 | `/lang`                                | 打开交互式设置菜单，每个选项都有一行说明                                              |
 | `/lang check off` \| `on` \| `context` | 检查与辅导的模式——`context` 让检查能看到会话内容（`/lang on`/`off` 仍可作为快捷开关） |
 | `/lang tutor on` \| `off`              | 单独开关写作辅导（关闭后母语消息不再显示面板）                                        |

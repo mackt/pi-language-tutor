@@ -15,7 +15,7 @@
         color-scheme: light dark;
       }
       @media (prefers-color-scheme: light) {
-        :root:not([data-theme="dark"]) {
+        :root:not([data-theme='dark']) {
           --bg: #ffffff;
           --text: #1a1a1a;
           --dim: #6b7280;
@@ -25,7 +25,7 @@
           color-scheme: light;
         }
       }
-      :root[data-theme="light"] {
+      :root[data-theme='light'] {
         --bg: #ffffff;
         --text: #1a1a1a;
         --dim: #6b7280;
@@ -34,7 +34,7 @@
         --scrim: rgba(255, 255, 255, 0.88);
         color-scheme: light;
       }
-      :root[data-theme="dark"] {
+      :root[data-theme='dark'] {
         color-scheme: dark;
       }
       * {
@@ -419,7 +419,9 @@
 
     <div id="help-overlay" class="overlay">
       <div id="help-card" class="overlay-card">
-        <div class="overlay-header"><span class="overlay-title">shortcuts</span><span class="overlay-close">×</span></div>
+        <div class="overlay-header">
+          <span class="overlay-title">shortcuts</span><span class="overlay-close">×</span>
+        </div>
         <div class="help-row"><kbd>space</kbd><span>flip card</span></div>
         <div class="help-row"><kbd>1–4</kbd><span>rate again / hard / good / easy</span></div>
         <div class="help-row"><kbd>enter</kbd><span>study now</span></div>
@@ -429,7 +431,9 @@
 
     <div id="settings-overlay" class="overlay">
       <div id="settings-card" class="overlay-card">
-        <div class="overlay-header"><span class="overlay-title">settings</span><span class="overlay-close">×</span></div>
+        <div class="overlay-header">
+          <span class="overlay-title">settings</span><span class="overlay-close">×</span>
+        </div>
         <div class="set-row">
           <span class="set-label">new cards per day</span>
           <span><input class="set-input" id="input-newPerDay" inputmode="numeric" /></span>
@@ -443,7 +447,9 @@
 
     <div id="edit-overlay" class="overlay">
       <div id="edit-card" class="overlay-card">
-        <div class="overlay-header"><span class="overlay-title">edit card</span><span class="overlay-close">×</span></div>
+        <div class="overlay-header">
+          <span class="overlay-title">edit card</span><span class="overlay-close">×</span>
+        </div>
         <input class="edit-field" id="edit-word" placeholder="word" />
         <textarea class="edit-field" id="edit-note" rows="3" placeholder="note"></textarea>
         <div class="edit-actions">
@@ -506,7 +512,13 @@
         pending = msg.pending || 0
         $('#due-num').textContent = due
         $('#due-label').textContent =
-          due === 0 ? (pending > 0 ? pending + ' left in round' : 'all caught up') : due === 1 ? 'card due' : 'cards due'
+          due === 0
+            ? pending > 0
+              ? pending + ' left in round'
+              : 'all caught up'
+            : due === 1
+              ? 'card due'
+              : 'cards due'
         const parts = [msg.total + ' total']
         if (msg.newCards > 0) parts.push(msg.newCards + ' new')
         parts.push('last review ' + ago(msg.lastReview))
@@ -736,8 +748,7 @@
           else if (view === 'review') {
             show('#main')
             window.glimpse.send({ type: 'overview' })
-          }
-          else window.glimpse.close()
+          } else window.glimpse.close()
         } else if (e.key === '?' || e.key === '？') {
           // '？' covers full-width input methods
           toggleHelp()

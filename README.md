@@ -86,7 +86,7 @@ Type `/lang` in the TUI to open the interactive settings menu, or set things dir
 | Command                                | What it does                                                                                                           |
 | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `/translate` or `alt+t`                | Translate the last assistant response (bilingual card)                                                                 |
-| `/flashcards`                               | Review flashcards captured from the Writing tutor                                                                      |
+| `/flashcards`                          | Review flashcards captured from the Writing tutor                                                                      |
 | `/lang`                                | Open the interactive settings menu — every option with an inline description                                           |
 | `/lang check off` \| `on` \| `context` | Writing check & tutor mode — `context` lets the review see the conversation (`/lang on`/`off` still work as shortcuts) |
 | `/lang tutor on` \| `off`              | Keep / drop just the writing tutor (off: native-language prompts show no panel)                                        |

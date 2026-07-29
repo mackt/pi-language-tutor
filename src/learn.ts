@@ -131,7 +131,13 @@ export function registerLearn(pi: ExtensionAPI): void {
   }
 
   const sendOverview = (): void => {
-    send({ type: 'overview', ...cardStats(cards, settings), pending: queue.length, theme: settings.theme, cards: listCards(cards) })
+    send({
+      type: 'overview',
+      ...cardStats(cards, settings),
+      pending: queue.length,
+      theme: settings.theme,
+      cards: listCards(cards)
+    })
   }
 
   /** Persist, merging with whatever landed on disk since we loaded. */
