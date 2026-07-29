@@ -33,20 +33,12 @@ not adjectives.
 
 ## Releases
 
-1. From the latest `main`, create a branch named `chore/bump-version-X.Y.Z`.
-2. Run `npm version minor|patch --no-git-tag-version`, commit only
-   `package.json` and `package-lock.json` as `chore(pkg): bump version to X.Y.Z`,
-   then open and merge the version-bump PR.
-3. Update local `main` to the merged commit, then create and push its annotated
-   tag: `git tag -a vX.Y.Z -m "chore(release): X.Y.Z"` followed by
-   `git push origin vX.Y.Z`.
-4. Run `gh release create vX.Y.Z --verify-tag --generate-notes` — publishing the
+1. Merge PRs into `main`.
+2. `npm version minor|patch -m "chore(release): %s"` (bumps, commits, tags `vX.Y.Z`).
+3. `git push --follow-tags`
+4. `gh release create vX.Y.Z --verify-tag --generate-notes` — publishing the
    GitHub release triggers `.github/workflows/publish.yml`, which publishes
    to npm via OIDC trusted publishing (no tokens).
-
-Do not run `npm version` again after the bump PR is merged; the merged manifest
-already contains the release version, and another minor/patch bump would advance
-it to the next version.
 
 The npm tarball is whitelisted by `files` in package.json; if you add
 runtime files outside `src/`, update it and sanity-check `npm pack --dry-run`.
