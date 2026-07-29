@@ -16,16 +16,15 @@ jobs:
   checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
 
       - run: npm ci
       - run: npm run check
       - run: npm test
-      # lint / fmt:check land with the oxlint+oxfmt PR (#5); --if-present
-      # keeps this workflow green on branches that predate those scripts.
-      - run: npm run lint --if-present
-      - run: npm run fmt:check --if-present
+      - run: npm run lint
+      - run: npm run fmt:check
+      - run: npm pack --dry-run
