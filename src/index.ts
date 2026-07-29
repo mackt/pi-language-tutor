@@ -11,10 +11,12 @@ import { registerReview } from './grammar.ts'
 import { createForkTracker } from './llm.ts'
 import { registerLangSettings } from './settings.ts'
 import { registerTranslation } from './translate.ts'
+import { registerLearn } from './learn.ts'
 
 export default function (pi: ExtensionAPI) {
   const fork = createForkTracker(pi)
   const review = registerReview(pi, fork)
   registerTranslation(pi, fork)
   registerLangSettings(pi, { disableReview: review.disable })
+  registerLearn(pi)
 }

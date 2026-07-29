@@ -14,6 +14,7 @@ import { Container, Text } from '@earendil-works/pi-tui'
 import { loadConfig } from './config.ts'
 import type { Config, GrammarItem, ReviewResult } from './core.ts'
 import { buildReviewPrompt, parseReviewResult, shouldSkipCheck } from './core.ts'
+import { addCards, loadCards, saveCards } from './flashcards.ts'
 import type { ForkContext } from './llm.ts'
 import { resolveModel, runLlm } from './llm.ts'
 import { showTutorWidget } from './tutor.ts'
@@ -97,6 +98,12 @@ export function registerReview(
         // guard covers a model that returns it anyway.
         if (cfg.tutor) {
           showTutorWidget(ctx, result.tutor)
+          // Auto-capture vocabulary as flashcards (deduped by word)
+          if (result.tutor.words.length > 0) {
+            const cards = loadCards()
+            const added = addCards(cards, result.tutor.words, 'tutor')
+            if (added > 0) saveCards(cards)
+          }
         } else {
           ctx.ui.setWidget(WIDGET_KEY, undefined)
         }

@@ -1,0 +1,777 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Flashcards</title>
+    <style>
+      :root {
+        --bg: #0a0a0a;
+        --text: #e5e5e5;
+        --dim: #737373;
+        --faint: #404040;
+        --line: #262626;
+        --scrim: rgba(10, 10, 10, 0.88);
+        color-scheme: light dark;
+      }
+      @media (prefers-color-scheme: light) {
+        :root:not([data-theme='dark']) {
+          --bg: #ffffff;
+          --text: #1a1a1a;
+          --dim: #6b7280;
+          --faint: #d4d4d4;
+          --line: #e5e5e5;
+          --scrim: rgba(255, 255, 255, 0.88);
+          color-scheme: light;
+        }
+      }
+      :root[data-theme='light'] {
+        --bg: #ffffff;
+        --text: #1a1a1a;
+        --dim: #6b7280;
+        --faint: #d4d4d4;
+        --line: #e5e5e5;
+        --scrim: rgba(255, 255, 255, 0.88);
+        color-scheme: light;
+      }
+      :root[data-theme='dark'] {
+        color-scheme: dark;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        height: 100vh;
+        overflow: hidden;
+        user-select: none;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .view {
+        height: 100vh;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        padding: 2rem;
+      }
+      .view.visible {
+        display: flex;
+      }
+
+      .hint {
+        font-size: 0.75rem;
+        color: var(--faint);
+        letter-spacing: 0.04em;
+      }
+      .hint kbd {
+        font-family: inherit;
+        color: var(--dim);
+      }
+
+      /* ---- Main: overview stats + card library ---- */
+      #main {
+        justify-content: flex-start;
+        gap: 0;
+        padding: 2.5rem 2rem 1.25rem;
+      }
+      #stats {
+        text-align: center;
+        margin-bottom: 1.75rem;
+      }
+      #due-num {
+        font-size: 3.5rem;
+        font-weight: 200;
+        line-height: 1;
+        letter-spacing: -0.03em;
+      }
+      #due-label {
+        font-size: 0.8rem;
+        color: var(--dim);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin-top: 0.4rem;
+      }
+      #secondary {
+        margin-top: 0.9rem;
+        font-size: 0.75rem;
+        color: var(--faint);
+      }
+      #lib-list {
+        flex: 1;
+        width: 100%;
+        max-width: 520px;
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: var(--line) transparent;
+        border-top: 1px solid var(--line);
+      }
+      .lib-row {
+        display: flex;
+        align-items: baseline;
+        gap: 0.75rem;
+        padding: 0.55rem 0.25rem;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+      }
+      .lib-word {
+        font-size: 0.95rem;
+        font-weight: 400;
+        white-space: nowrap;
+      }
+      .lib-note {
+        flex: 1;
+        font-size: 0.8rem;
+        color: var(--dim);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .lib-meta {
+        font-size: 0.75rem;
+        color: var(--faint);
+        white-space: nowrap;
+      }
+      #empty-note {
+        flex: 1;
+        display: none;
+        align-items: center;
+        text-align: center;
+        max-width: 320px;
+        line-height: 1.8;
+      }
+      #main #begin-btn {
+        margin-top: 1.25rem;
+      }
+
+      /* ---- Review ---- */
+      #review {
+        justify-content: center;
+        gap: 1rem;
+        text-align: center;
+        position: relative;
+      }
+      .back-link {
+        position: absolute;
+        top: 14px;
+        left: 16px;
+        cursor: pointer;
+      }
+      .back-link:hover {
+        color: var(--dim);
+      }
+      #word {
+        font-size: 2.75rem;
+        font-weight: 300;
+        letter-spacing: -0.01em;
+      }
+      #note {
+        display: none;
+        margin-top: 1.5rem;
+        font-size: 1rem;
+        font-weight: 300;
+        color: var(--dim);
+        line-height: 1.7;
+        max-width: 420px;
+      }
+      #card.flipped #note {
+        display: block;
+      }
+      #rating-area {
+        display: none;
+        gap: 0.75rem;
+        margin-top: 2.5rem;
+      }
+      #rating-area.visible {
+        display: flex;
+      }
+      .rate-btn {
+        background: transparent;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        color: var(--dim);
+        padding: 0.6rem 1.2rem;
+        font-size: 0.85rem;
+        font-weight: 400;
+        cursor: pointer;
+        transition:
+          border-color 0.15s,
+          color 0.15s;
+      }
+      .rate-btn:hover {
+        border-color: var(--dim);
+        color: var(--text);
+      }
+      .rate-btn kbd {
+        font-family: inherit;
+        color: var(--faint);
+        margin-left: 0.4rem;
+        font-size: 0.75rem;
+      }
+      #show-answer {
+        margin-top: 2.5rem;
+        padding: 0.7rem 2.5rem;
+      }
+      #edit-link {
+        position: absolute;
+        top: 44px;
+        right: 16px;
+        cursor: pointer;
+      }
+      #edit-link:hover {
+        color: var(--dim);
+      }
+      #edit-card {
+        gap: 1rem;
+        min-width: 340px;
+      }
+      .edit-field {
+        background: transparent;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        color: var(--text);
+        font-family: inherit;
+        font-size: 0.9rem;
+        padding: 0.5rem 0.7rem;
+        outline: none;
+        width: 100%;
+        resize: vertical;
+        transition: border-color 0.15s;
+      }
+      .edit-field:focus {
+        border-color: var(--dim);
+      }
+      .edit-actions {
+        display: flex;
+        justify-content: space-between;
+      }
+      #edit-delete {
+        color: var(--faint);
+      }
+      #edit-delete:hover {
+        color: var(--text);
+      }
+      .lib-row {
+        cursor: pointer;
+      }
+      .lib-row:hover .lib-word {
+        color: var(--text);
+      }
+
+      /* ---- Help overlay ---- */
+      .corner-group {
+        position: fixed;
+        top: 12px;
+        right: 14px;
+        display: flex;
+        gap: 8px;
+      }
+      .corner-btn {
+        padding: 2px 8px;
+        border: none;
+        border-radius: 10px;
+        background: transparent;
+        color: var(--faint);
+        font-size: 0.75rem;
+        cursor: pointer;
+        transition: color 0.15s;
+      }
+      .corner-btn:hover {
+        color: var(--dim);
+      }
+
+      /* Overlays: transient layers (help, settings) above the views */
+      .overlay {
+        position: fixed;
+        inset: 0;
+        background: var(--scrim);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+      .overlay.visible {
+        display: flex;
+      }
+      .overlay-header {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .overlay-title {
+        font-size: 0.85rem;
+        color: var(--dim);
+      }
+      .overlay-close {
+        position: absolute;
+        right: 0;
+        font-size: 1.1rem;
+        line-height: 1;
+        color: var(--faint);
+        cursor: pointer;
+        transition: color 0.15s;
+      }
+      .overlay-close:hover {
+        color: var(--dim);
+      }
+      .overlay-card {
+        display: flex;
+        flex-direction: column;
+        gap: 0.9rem;
+        cursor: default;
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 1.5rem 1.75rem;
+      }
+      .help-row {
+        display: flex;
+        align-items: baseline;
+        gap: 1.25rem;
+        font-size: 0.85rem;
+        color: var(--dim);
+      }
+      .help-row kbd {
+        font-family: inherit;
+        color: var(--text);
+        min-width: 3.5rem;
+        text-align: right;
+      }
+
+      /* ---- Settings ---- */
+      #settings-card {
+        gap: 1.5rem;
+      }
+      .set-row {
+        display: flex;
+        align-items: center;
+        gap: 2rem;
+        width: 100%;
+        min-width: 320px;
+      }
+      .set-label {
+        flex: 1;
+        text-align: left;
+        font-size: 0.85rem;
+        color: var(--dim);
+      }
+      .set-input {
+        background: transparent;
+        border: none;
+        border-bottom: 1px solid var(--line);
+        color: var(--text);
+        width: 3.5rem;
+        text-align: center;
+        font-size: 0.95rem;
+        font-family: inherit;
+        padding: 0.2rem 0;
+        outline: none;
+        transition: border-color 0.15s;
+      }
+      .set-input:focus {
+        border-color: var(--dim);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Main: overview + library, one screen -->
+    <div id="main" class="view visible">
+      <div id="stats">
+        <div id="due-num">–</div>
+        <div id="due-label">cards due</div>
+        <div id="secondary"></div>
+      </div>
+      <div id="lib-list"></div>
+      <div id="empty-note" class="hint">
+        new cards appear here as you write prompts in your learning language
+      </div>
+      <button class="rate-btn" id="begin-btn">study now</button>
+    </div>
+
+    <!-- Review -->
+    <div id="review" class="view">
+      <div class="hint back-link" id="back-link">← back</div>
+      <div class="hint" id="edit-link">edit</div>
+      <div id="card">
+        <div id="word"></div>
+        <div id="note"></div>
+      </div>
+      <div id="rating-area">
+        <button class="rate-btn" data-rating="1">again<kbd>1</kbd></button>
+        <button class="rate-btn" data-rating="2">hard<kbd>2</kbd></button>
+        <button class="rate-btn" data-rating="3">good<kbd>3</kbd></button>
+        <button class="rate-btn" data-rating="4">easy<kbd>4</kbd></button>
+      </div>
+      <button class="rate-btn" id="show-answer">show answer</button>
+    </div>
+
+    <!-- Corner buttons open transient overlays -->
+    <div class="corner-group">
+      <button id="theme-btn" class="corner-btn">system</button>
+      <button id="help-btn" class="corner-btn">shortcuts</button>
+      <button id="settings-btn" class="corner-btn">settings</button>
+    </div>
+
+    <div id="help-overlay" class="overlay">
+      <div id="help-card" class="overlay-card">
+        <div class="overlay-header">
+          <span class="overlay-title">shortcuts</span><span class="overlay-close">×</span>
+        </div>
+        <div class="help-row"><kbd>space</kbd><span>flip card</span></div>
+        <div class="help-row"><kbd>1–4</kbd><span>rate again / hard / good / easy</span></div>
+        <div class="help-row"><kbd>enter</kbd><span>study now</span></div>
+        <div class="help-row"><kbd>esc</kbd><span>back / close</span></div>
+      </div>
+    </div>
+
+    <div id="settings-overlay" class="overlay">
+      <div id="settings-card" class="overlay-card">
+        <div class="overlay-header">
+          <span class="overlay-title">settings</span><span class="overlay-close">×</span>
+        </div>
+        <div class="set-row">
+          <span class="set-label">new cards per day</span>
+          <span><input class="set-input" id="input-newPerDay" inputmode="numeric" /></span>
+        </div>
+        <div class="set-row">
+          <span class="set-label">cards per round</span>
+          <span><input class="set-input" id="input-sessionLimit" inputmode="numeric" /></span>
+        </div>
+      </div>
+    </div>
+
+    <div id="edit-overlay" class="overlay">
+      <div id="edit-card" class="overlay-card">
+        <div class="overlay-header">
+          <span class="overlay-title">edit card</span><span class="overlay-close">×</span>
+        </div>
+        <input class="edit-field" id="edit-word" placeholder="word" />
+        <textarea class="edit-field" id="edit-note" rows="3" placeholder="note"></textarea>
+        <div class="edit-actions">
+          <button class="rate-btn" id="edit-delete">delete</button>
+          <button class="rate-btn" id="edit-save">save</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let flipped = false
+      let cardId = ''
+      let due = 0
+      let pending = 0
+      let view = 'main'
+      let settings = null
+      let editingId = ''
+
+      const $ = (sel) => document.querySelector(sel)
+
+      function show(id) {
+        document.querySelectorAll('.view').forEach((v) => v.classList.remove('visible'))
+        $(id).classList.add('visible')
+        view = id.slice(1)
+      }
+
+      function ago(iso) {
+        if (!iso) return 'never'
+        const s = (Date.now() - new Date(iso).getTime()) / 1000
+        if (s < 90) return 'just now'
+        if (s < 3600) return Math.floor(s / 60) + 'm ago'
+        if (s < 86400) return Math.floor(s / 3600) + 'h ago'
+        return Math.floor(s / 86400) + 'd ago'
+      }
+
+      function fromNow(iso) {
+        const s = (new Date(iso).getTime() - Date.now()) / 1000
+        if (s < 90) return 'in a moment'
+        if (s < 3600) return 'in ' + Math.ceil(s / 60) + 'm'
+        if (s < 86400) return 'in ' + Math.ceil(s / 3600) + 'h'
+        return 'in ' + Math.ceil(s / 86400) + 'd'
+      }
+
+      function cardMeta(c) {
+        if (c.state === 0) return 'new'
+        let m = 'due'
+        if (c.due && new Date(c.due).getTime() > Date.now()) m = fromNow(c.due)
+        if (c.lapses > 0) m += ' · ' + c.lapses + (c.lapses === 1 ? ' lapse' : ' lapses')
+        return m
+      }
+
+      function renderOverview(msg) {
+        applyTheme(msg.theme)
+        updateOverview(msg)
+        show('#main')
+      }
+
+      function updateOverview(msg) {
+        due = msg.due
+        pending = msg.pending || 0
+        $('#due-num').textContent = due
+        $('#due-label').textContent =
+          due === 0
+            ? pending > 0
+              ? pending + ' left in round'
+              : 'all caught up'
+            : due === 1
+              ? 'card due'
+              : 'cards due'
+        const parts = [msg.total + ' total']
+        if (msg.newCards > 0) parts.push(msg.newCards + ' new')
+        parts.push('last review ' + ago(msg.lastReview))
+        // Nothing due but cards exist: say when they come back, so a big "0"
+        // isn't misread as "your words are gone".
+        if (due === 0 && msg.nextDue) parts.push('next review ' + fromNow(msg.nextDue))
+        $('#secondary').textContent = parts.join(' · ')
+
+        const list = $('#lib-list')
+        list.textContent = ''
+        for (const c of msg.cards) {
+          const row = document.createElement('div')
+          row.className = 'lib-row'
+          const word = document.createElement('span')
+          word.className = 'lib-word'
+          word.textContent = c.word
+          const note = document.createElement('span')
+          note.className = 'lib-note'
+          note.textContent = c.note
+          const meta = document.createElement('span')
+          meta.className = 'lib-meta'
+          meta.textContent = cardMeta(c)
+          row.append(word, note, meta)
+          row.addEventListener('click', () => openEditFor(c.id, c.word, c.note))
+          list.appendChild(row)
+        }
+        list.style.display = msg.cards.length > 0 ? '' : 'none'
+        $('#empty-note').style.display = msg.cards.length > 0 ? 'none' : 'flex'
+        $('#begin-btn').style.visibility = due + pending > 0 ? 'visible' : 'hidden'
+      }
+
+      function renderCard(msg) {
+        $('#word').textContent = msg.card.word
+        $('#note').textContent = msg.card.note
+        cardId = msg.card.id
+        flipped = false
+        $('#card').classList.remove('flipped')
+        $('#rating-area').classList.remove('visible')
+        $('#show-answer').style.display = ''
+        show('#review')
+      }
+
+      // Only these two are editable in the UI. requestRetention stays
+      // power-user-only via the settings JSON (see flashcards.ts).
+      const SETTING_LIMITS = {
+        newPerDay: [0, 500],
+        sessionLimit: [1, 200]
+      }
+
+      const settingInput = (key) => $('#input-' + key)
+
+      function showSettings() {
+        if (!settings) return
+        // Don't clobber a field the user is editing
+        for (const key of Object.keys(SETTING_LIMITS)) {
+          const input = settingInput(key)
+          if (document.activeElement === input) continue
+          input.value = settings[key]
+        }
+        toggleSettings(true)
+      }
+
+      function renderSettings(msg) {
+        settings = msg.settings
+        showSettings()
+      }
+
+      function commitSetting(key) {
+        if (!settings) return
+        const raw = parseInt(settingInput(key).value, 10)
+        if (Number.isNaN(raw)) {
+          showSettings() // reset the field to the current value
+          return
+        }
+        const [lo, hi] = SETTING_LIMITS[key]
+        const v = Math.min(hi, Math.max(lo, raw))
+        if (v === settings[key]) {
+          showSettings()
+          return
+        }
+        settings = { ...settings, [key]: v }
+        showSettings()
+        window.glimpse.send({ type: 'saveSettings', settings })
+      }
+
+      function flip() {
+        if (view !== 'review' || !cardId || flipped) return
+        flipped = true
+        $('#card').classList.add('flipped')
+        $('#rating-area').classList.add('visible')
+        $('#show-answer').style.display = 'none'
+      }
+
+      function openEditFor(id, word, note) {
+        editingId = id
+        $('#edit-word').value = word
+        $('#edit-note').value = note
+        toggleOverlay('#edit-overlay', true)
+        $('#edit-word').focus()
+      }
+
+      function saveEdit() {
+        const word = $('#edit-word').value.trim()
+        const note = $('#edit-note').value.trim()
+        if (!word || !note || !editingId) return
+        window.glimpse.send({ type: 'edit', id: editingId, word, note })
+        toggleOverlay('#edit-overlay', false)
+      }
+
+      function deleteEdit() {
+        if (!editingId) return
+        window.glimpse.send({ type: 'delete', id: editingId })
+        toggleOverlay('#edit-overlay', false)
+      }
+
+      function rate(rating) {
+        if (view !== 'review' || !flipped || !cardId) return
+        const id = cardId
+        cardId = '' // ignore further keypresses until the next card arrives
+        window.glimpse.send({ type: 'rate', rating, cardId: id })
+        $('#rating-area').classList.remove('visible')
+      }
+
+      function start() {
+        // Host may still hold Again/Hard retries even when nothing is due.
+        if (due + pending <= 0 || view !== 'main') return
+        window.glimpse.send({ type: 'start' })
+      }
+
+      function toggleHelp(force) {
+        toggleOverlay('#help-overlay', force)
+      }
+
+      function toggleSettings(force) {
+        toggleOverlay('#settings-overlay', force)
+      }
+
+      function toggleOverlay(sel, force) {
+        const overlay = $(sel)
+        const open = force !== undefined ? force : !overlay.classList.contains('visible')
+        overlay.classList.toggle('visible', open)
+      }
+
+      function overlayOpen() {
+        return (
+          $('#help-overlay').classList.contains('visible') ||
+          $('#settings-overlay').classList.contains('visible') ||
+          $('#edit-overlay').classList.contains('visible')
+        )
+      }
+
+      function closeOverlays() {
+        toggleHelp(false)
+        toggleSettings(false)
+        toggleOverlay('#edit-overlay', false)
+      }
+
+      // Theme: system (default) → light → dark, persisted by the host in flashcards-settings.json
+      const themeBtn = $('#theme-btn')
+      let themeMode = 'system'
+      function applyTheme(mode) {
+        themeMode = ['system', 'light', 'dark'].includes(mode) ? mode : 'system'
+        if (themeMode === 'system') delete document.documentElement.dataset.theme
+        else document.documentElement.dataset.theme = themeMode
+        themeBtn.textContent = themeMode
+      }
+      themeBtn.addEventListener('click', () => {
+        const next = themeMode === 'system' ? 'light' : themeMode === 'light' ? 'dark' : 'system'
+        applyTheme(next)
+        window.glimpse.send({ type: 'saveTheme', theme: themeMode })
+      })
+      applyTheme('system')
+
+      $('#show-answer').addEventListener('click', flip)
+      $('#begin-btn').addEventListener('click', start)
+      $('#back-link').addEventListener('click', () => {
+        show('#main') // instant; fresh stats arrive via the overview response
+        window.glimpse.send({ type: 'overview' })
+      })
+      $('#edit-link').addEventListener('click', () => {
+        if (view !== 'review' || !cardId) return
+        openEditFor(cardId, $('#word').textContent, $('#note').textContent)
+      })
+      $('#edit-save').addEventListener('click', saveEdit)
+      $('#edit-delete').addEventListener('click', deleteEdit)
+      $('#edit-overlay').addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) toggleOverlay('#edit-overlay', false)
+      })
+      document.querySelectorAll('.edit-field').forEach((field) => {
+        field.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && field.tagName === 'INPUT') saveEdit()
+          else if (e.key === 'Escape') toggleOverlay('#edit-overlay', false)
+          e.stopPropagation() // typing must not trigger global shortcuts
+        })
+      })
+      $('#settings-btn').addEventListener('click', () => window.glimpse.send({ type: 'settings' }))
+      document.querySelectorAll('.set-input').forEach((input) => {
+        const key = input.id.replace('input-', '')
+        // Commit on blur or Enter
+        input.addEventListener('change', () => commitSetting(key))
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') input.blur()
+          else if (e.key === 'Escape') {
+            showSettings() // discard the edit
+            input.blur()
+          }
+          e.stopPropagation() // typing must not trigger global shortcuts
+        })
+      })
+      $('#help-btn').addEventListener('click', () => toggleHelp())
+      $('#help-overlay').addEventListener('click', () => toggleHelp(false))
+      document.querySelectorAll('.overlay-close').forEach((el) => {
+        el.addEventListener('click', () => el.closest('.overlay').classList.remove('visible'))
+      })
+      $('#settings-overlay').addEventListener('click', (e) => {
+        // Click the backdrop to close; clicks inside the card stay
+        if (e.target === e.currentTarget) toggleSettings(false)
+      })
+      document.querySelectorAll('.rate-btn[data-rating]').forEach((btn) => {
+        btn.addEventListener('click', () => rate(parseInt(btn.dataset.rating, 10)))
+      })
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          if (overlayOpen()) closeOverlays()
+          // Review → back to main (session resumes on Enter); main → close.
+          else if (view === 'review') {
+            show('#main')
+            window.glimpse.send({ type: 'overview' })
+          } else window.glimpse.close()
+        } else if (e.key === '?' || e.key === '？') {
+          // '？' covers full-width input methods
+          toggleHelp()
+        } else if (e.key === 'Enter') {
+          e.preventDefault()
+          start()
+        } else if (e.key === ' ' || e.code === 'Space') {
+          e.preventDefault()
+          if (view === 'main') start()
+          else flip()
+        } else if (e.key >= '1' && e.key <= '4') {
+          e.preventDefault()
+          rate(parseInt(e.key, 10))
+        }
+      })
+
+      window.__reviewReceive = function (msg) {
+        if (msg.type === 'overview') renderOverview(msg)
+        else if (msg.type === 'card') renderCard(msg)
+        else if (msg.type === 'settings') renderSettings(msg)
+      }
+
+      window.glimpse.send({ type: 'ready' })
+    </script>
+  </body>
+</html>

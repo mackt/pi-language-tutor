@@ -58,11 +58,13 @@ ln -s "$(pwd)/pi-language-tutor" ~/.pi/agent/extensions/pi-language-tutor
 
    A `✏ Writing tutor` panel appears: a natural whole-sentence rendering in the learning language, the key new words (each explained in your native language — meaning, usage, why this word over a synonym), and the grammatical structures carrying the sentence. One panel teaches you how to say what you couldn't.
 
-3. When the agent finishes, press `alt+t` (macOS: ⌥T — [enable Option-as-Meta](https://iterm2.com/documentation-preferences-profiles-keys.html) in your terminal, or run `/translate`). The response re-renders as a bilingual card: each paragraph followed by its translation.
+3. Words the tutor teaches are saved as flashcards automatically. Type `/flashcards` to review them in a small window — Anki-style: flip the card with Show Answer, rate yourself Again / Hard / Good / Easy, and an FSRS scheduler decides when each word comes back.
+
+4. When the agent finishes, press `alt+t` (macOS: ⌥T — [enable Option-as-Meta](https://iterm2.com/documentation-preferences-profiles-keys.html) in your terminal, or run `/translate`). The response re-renders as a bilingual card: each paragraph followed by its translation.
 
    <img src="https://raw.githubusercontent.com/mackt/pi-language-tutor/main/docs/bilingual-card.png" width="720" alt="The bilingual card: each paragraph of the agent's response is followed by its translation, immersive-translate style, with code blocks kept intact.">
 
-4. Like the bilingual view? Make it automatic:
+5. Like the bilingual view? Make it automatic:
 
    ```text
    /lang auto on
@@ -84,6 +86,7 @@ Type `/lang` in the TUI to open the interactive settings menu, or set things dir
 | Command                                | What it does                                                                                                           |
 | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `/translate` or `alt+t`                | Translate the last assistant response (bilingual card)                                                                 |
+| `/flashcards`                          | Review flashcards captured from the Writing tutor                                                                      |
 | `/lang`                                | Open the interactive settings menu — every option with an inline description                                           |
 | `/lang check off` \| `on` \| `context` | Writing check & tutor mode — `context` lets the review see the conversation (`/lang on`/`off` still work as shortcuts) |
 | `/lang tutor on` \| `off`              | Keep / drop just the writing tutor (off: native-language prompts show no panel)                                        |
@@ -111,6 +114,8 @@ Settings persist in `~/.pi/agent/language-learn.json`.
 
 `model` defaults to the session model.
 
+Flashcards and the review limits live in separate files: `~/.pi/agent/flashcards.json` (the cards) and `~/.pi/agent/flashcards-settings.json` (`newPerDay`, `sessionLimit`, and `requestRetention` — the FSRS desired retention, editable only here, not in the UI).
+
 ## Details
 
 **What gets reviewed.** To avoid wasted tokens and noise, the review skips: slash/bang commands, trivially short prompts, messages that are mostly code or paths, and everything while `/lang off`. CJK prompts are counted by characters, not whitespace words, so a substantial native-language prompt still reaches the tutor. Reviews run only in interactive TUI mode, and a failed review never disturbs your session.
@@ -118,6 +123,8 @@ Settings persist in `~/.pi/agent/language-learn.json`.
 **Writing check vs. Writing tutor.** A single LLM call inspects each prompt and picks a mode. If the prompt is in your learning language, it reviews spelling, grammar, and phrasing (the `✏ Writing check` panel). If the prompt is in your native language — you couldn't yet express it in the learning language — it teaches instead (the `✏ Writing tutor` panel): a natural whole-sentence rendering, the key new vocabulary (each explained in your native language), and the grammatical structures at work. The two are complementary and never both fire on the same prompt. If you often write prompts in your native language on purpose and the tutor panel gets noisy, `/lang tutor off` restores the check-only behavior — native-language prompts then show no panel at all, while the writing check keeps working.
 
 **Bilingual cards.** Paragraphs are aligned original-then-translation, immersive-translate style. Short code blocks (≤5 lines) are kept in the card; longer ones become a `[code block ↑ N lines]` placeholder since the original sits right above. Auto mode skips intermediate tool-call narration and responses under ~15 words; the footer shows `🌐 auto` while enabled.
+
+**Flashcards.** Every word the Writing tutor teaches is captured as a flashcard, deduplicated by word. `/flashcards` opens a review window: your whole library with per-card status (new / due / when it's due back, lapses included), plus a Study Now round of due cards. Rating is Anki-style — Again and Hard keep the card in the round for another pass, Good and Easy graduate it. Scheduling is FSRS (via ts-fsrs) with short-term minute-level steps disabled, so one rating moves a card straight to a day-level interval. New cards are introduced up to a daily budget; both that and the round size are editable in the window's ⚙ settings. Every card can be edited or deleted from the review screen or the library list. Writes are atomic, and words captured while a review window is open are merged in — never overwritten.
 
 **Custom providers.** On pi 0.81+, checks and translations go through the composed provider's `streamSimple` — the same dispatch the main session uses — so custom providers work whether they were registered as a config (such as Cursor's `cursor-sdk`) or as a native `Provider` object. On pi 0.80 the extension falls back to pi-ai's `completeSimple`; the global api registry there already covered custom providers.
 
@@ -136,4 +143,4 @@ npm run check   # typecheck
 npm test        # unit tests for the skip heuristics and response parsing
 ```
 
-Layout: `src/core.ts` holds the pure logic (heuristics, prompts, parsing, card assembly — what the tests import, zero pi imports) and `src/config.ts` the config persistence. The pi-facing side is split by feature: `src/llm.ts` (model resolution, LLM calls, session-fork tracking), `src/grammar.ts` (the unified review: writing check + writing tutor dispatch), `src/tutor.ts` (the writing tutor renderer), `src/translate.ts` (bilingual cards), `src/settings.ts` (`/lang` command and menu), with `src/index.ts` as the composition root wiring them together. `language-learn.ts` is the entry point re-exporting core and the default export.
+Layout: `src/core.ts` holds the pure logic (heuristics, prompts, parsing, card assembly — what the tests import, zero pi imports) and `src/config.ts` the config persistence. The pi-facing side is split by feature: `src/llm.ts` (model resolution, LLM calls, session-fork tracking), `src/grammar.ts` (the unified review: writing check + writing tutor dispatch), `src/tutor.ts` (the writing tutor renderer), `src/translate.ts` (bilingual cards), `src/settings.ts` (`/lang` command and menu), with `src/index.ts` as the composition root wiring them together. The flashcard feature follows the same split: `src/flashcards.ts` (pure card logic and FSRS scheduling), `src/flashcard-settings.ts` (review settings), `src/learn.ts` (the `/flashcards` window controller), and `web/flashcards.html` (the self-contained review UI). `language-learn.ts` is the entry point re-exporting core and the default export.
