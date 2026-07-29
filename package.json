@@ -7,7 +7,9 @@
   "main": "language-learn.ts",
   "files": [
     "language-learn.ts",
-    "src"
+    "src",
+    "web",
+    "types"
   ],
   "pi": {
     "extensions": [
@@ -42,5 +44,9 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mackt/pi-language-tutor.git"
+  },
+  "dependencies": {
+    "glimpseui": "^0.8.1",
+    "ts-fsrs": "^5.4.1"
   }
 }

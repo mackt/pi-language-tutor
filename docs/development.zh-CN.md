@@ -17,41 +17,45 @@ ln -s "$(pwd)" ~/.pi/agent/extensions/pi-language-tutor
 
 ```sh
 npm run check      # 类型检查（tsc --noEmit）
-npm test           # 单元测试（vitest）：跳过判定、解析、纯逻辑
+npm test           # 单元测试（vitest）：核心行为与记忆卡片调度
 npm run lint       # oxlint
 npm run fmt        # oxfmt
 npm run fmt:check  # 格式检查（CI）
 ```
 
-开 PR 前 `npm run check` 与 `npm test` 都必须通过（见 [AGENTS.md](../AGENTS.md)）。
+开 PR 前，`npm run check`、`npm test`、`npm run lint` 与 `npm run fmt:check` 必须全部通过（见 [AGENTS.md](../AGENTS.md)）。
 
 ## 目录
 
-| 路径 | 职责 |
-| --- | --- |
-| `src/core.ts` | 纯逻辑：跳过判定、prompt、解析、卡片拼装。**不 import 任何 pi 包**——单元测试只依赖它 |
-| `src/config.ts` | 配置读写（`~/.pi/agent/language-learn.json`） |
-| `src/llm.ts` | 模型解析、LLM 调用、会话 fork 捕获 |
-| `src/grammar.ts` | 统一检查入口：分发 Writing check 与 Writing tutor |
-| `src/tutor.ts` | 写作辅导渲染 |
-| `src/translate.ts` | 双语卡片 |
-| `src/settings.ts` | `/lang` 命令与设置菜单 |
-| `src/index.ts` | 组装根 |
-| `language-learn.ts` | 包入口：导出 core + 默认扩展 |
+| 路径                        | 职责                                                                                 |
+| --------------------------- | ------------------------------------------------------------------------------------ |
+| `src/core.ts`               | 纯逻辑：跳过判定、prompt、解析、卡片拼装。**不 import 任何 pi 包**——单元测试只依赖它 |
+| `src/config.ts`             | 配置读写（`~/.pi/agent/language-learn.json`）                                        |
+| `src/llm.ts`                | 模型解析、LLM 调用、会话 fork 捕获                                                   |
+| `src/grammar.ts`            | 统一检查入口：分发 Writing check 与 Writing tutor                                    |
+| `src/tutor.ts`              | 写作辅导渲染                                                                         |
+| `src/translate.ts`          | 双语卡片                                                                             |
+| `src/flashcards.ts`         | 记忆卡片持久化与 FSRS 调度                                                           |
+| `src/flashcard-settings.ts` | 记忆卡片复习设置                                                                     |
+| `src/learn.ts`              | `/flashcards` 复习窗口控制器                                                         |
+| `src/settings.ts`           | `/lang` 命令与设置菜单                                                               |
+| `src/index.ts`              | 组装根                                                                               |
+| `web/flashcards.html`       | 自包含的记忆卡片复习界面                                                             |
+| `types/glimpseui.d.ts`      | 复习窗口依赖的本地类型声明                                                           |
+| `language-learn.ts`         | 包入口：导出 core + 默认扩展                                                         |
 
 特性模块保持单向依赖；不需要 pi API 的新逻辑放进 `core.ts`。
 
 ## 产品图
 
-| 资源 | 说明 |
-| --- | --- |
-| `docs/writing-check.png` | 真实终端截图 |
-| `docs/bilingual-card.png` | 真实终端截图 |
-| `docs/writing-tutor.png` | 真机截图（`docs/_shots/writing-tutor.html` 仍保留作备用模板） |
-| `docs/demo.gif` | 三块面板轮播，供 README 门面使用 |
-| `docs/logo.png` | 256×256，README 标题用 |
-| `docs/icon.png` | 完整 app icon 源图 |
-| `docs/icon-v3.svg` | 矢量标 |
+| 资源                      | 说明                                                          |
+| ------------------------- | ------------------------------------------------------------- |
+| `docs/writing-check.png`  | 真实终端截图                                                  |
+| `docs/bilingual-card.png` | 真实终端截图                                                  |
+| `docs/writing-tutor.png`  | 真机截图（`docs/_shots/writing-tutor.html` 仍保留作备用模板） |
+| `docs/demo.gif`           | 三块面板轮播，供 README 门面使用                              |
+| `docs/logo.png`           | 256×256，README 标题用                                        |
+| `docs/icon.png`           | 完整 app icon 源图                                            |
 
 重新生成 tutor mock：
 

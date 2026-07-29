@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Learn a foreign language while you code.</strong><br />
-  A <a href="https://pi.dev">pi</a> extension that reviews your prompts, teaches you how to say what you couldn’t yet, and turns agent replies into bilingual immersive translations.
+  A <a href="https://pi.dev">pi</a> extension that reviews your prompts, teaches you how to say what you couldn’t yet, saves new words as flashcards, and turns agent replies into bilingual immersive translations.
 </p>
 
 <p align="center">
@@ -63,6 +63,10 @@ Prompt in your **native** language because the thought came faster that way. The
 
 <img src="https://raw.githubusercontent.com/mackt/pi-language-tutor/main/docs/writing-tutor.png" width="720" alt="Writing tutor panel: whole-sentence English, vocabulary notes, and grammar for a Chinese prompt" />
 
+### 🗂 Flashcard review
+
+Words taught by the Writing tutor are saved automatically. Run `/flashcards` to study them with an Anki-style flow; an FSRS scheduler decides when each card comes back.
+
 ### 🌐 Bilingual cards
 
 After a reply, press `alt+t` (macOS: ⌥T) or run `/translate`. Each paragraph is followed by its translation — immersive-translate style, with short code blocks kept intact.
@@ -87,9 +91,11 @@ After a reply, press `alt+t` (macOS: ⌥T) or run `/translate`. Each paragraph i
 
    A `✏ Writing tutor` panel appears: a natural whole-sentence rendering, key vocabulary, and grammar.
 
-3. When the agent finishes, press `alt+t` (on macOS, [enable Option-as-Meta](https://iterm2.com/documentation-preferences-profiles-keys.html) in your terminal, or run `/translate`). The reply re-renders as a bilingual card.
+3. Words from the tutor are now flashcards. Run `/flashcards`, show the answer, then rate yourself Again / Hard / Good / Easy.
 
-4. Prefer auto-translate on every final response?
+4. When the agent finishes, press `alt+t` (on macOS, [enable Option-as-Meta](https://iterm2.com/documentation-preferences-profiles-keys.html) in your terminal, or run `/translate`). The reply re-renders as a bilingual card.
+
+5. Prefer auto-translate on every final response?
 
    ```text
    /lang auto on
@@ -99,29 +105,30 @@ That’s enough to start.
 
 ## Design principles
 
-| | |
-| --- | --- |
-| **Nothing ever blocks** | Your message goes to the agent immediately; the review runs in parallel. A clean message shows no panel at all. |
-| **Two panels, never both** | Learning language → Writing check. Native language → Writing tutor. One LLM call decides — they never both fire. |
-| **Nothing pollutes the conversation** | Translation cards live only in your terminal — never sent back to the LLM, no context cost. |
-| **You control the spend** | Features use your session model by default; point them at a cheaper one with `/lang model`. |
+|                                       |                                                                                                                  |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **Nothing ever blocks**               | Your message goes to the agent immediately; the review runs in parallel. A clean message shows no panel at all.  |
+| **Two panels, never both**            | Learning language → Writing check. Native language → Writing tutor. One LLM call decides — they never both fire. |
+| **Nothing pollutes the conversation** | Translation cards live only in your terminal — never sent back to the LLM, no context cost.                      |
+| **You control the spend**             | Features use your session model by default; point them at a cheaper one with `/lang model`.                      |
 
 ## Settings
 
 Type `/lang` for the interactive menu, or set options directly:
 
-| Command | What it does |
-| --- | --- |
-| `/translate` or `alt+t` | Translate the last assistant response |
-| `/lang` | Interactive settings menu |
+| Command                                | What it does                                                                              |
+| -------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `/translate` or `alt+t`                | Translate the last assistant response                                                     |
+| `/flashcards`                          | Review flashcards captured from the Writing tutor                                         |
+| `/lang`                                | Interactive settings menu                                                                 |
 | `/lang check off` \| `on` \| `context` | Writing check & tutor mode (`context` sees the conversation; `/lang on`/`off` still work) |
-| `/lang tutor on` \| `off` | Keep / drop the writing tutor alone |
-| `/lang auto on` \| `off` | Auto-translate every final response |
-| `/lang native <code>` | Native language — translations & explanations (`zh-CN`, `ja`, …) |
-| `/lang learning <code>` | Language you’re practicing (`en`, `fr`, …) |
-| `/lang model [model]` | Model for this extension |
-| `/lang model default` | Follow the session model |
-| `/lang context on` \| `off` | Translations with full session context (off by default) |
+| `/lang tutor on` \| `off`              | Keep / drop the writing tutor alone                                                       |
+| `/lang auto on` \| `off`               | Auto-translate every final response                                                       |
+| `/lang native <code>`                  | Native language — translations & explanations (`zh-CN`, `ja`, …)                          |
+| `/lang learning <code>`                | Language you’re practicing (`en`, `fr`, …)                                                |
+| `/lang model [model]`                  | Model for this extension                                                                  |
+| `/lang model default`                  | Follow the session model                                                                  |
+| `/lang context on` \| `off`            | Translations with full session context (off by default)                                   |
 
 ## Configuration
 
@@ -141,11 +148,13 @@ Settings persist in `~/.pi/agent/language-learn.json`.
 
 `model` defaults to the session model. `tutor` defaults to on.
 
+Flashcards are stored in `~/.pi/agent/flashcards.json`. Review limits and FSRS desired retention are stored in `~/.pi/agent/flashcards-settings.json`.
+
 ## Advanced
 
-Skip heuristics, check vs tutor rules, bilingual card details, custom providers, and context-mode cost trade-offs:
+Skip heuristics, check vs tutor rules, flashcard scheduling, bilingual card details, custom providers, and context-mode cost trade-offs:
 
-→ **[docs/advanced.md](docs/advanced.md)**
+→ **[Advanced behavior](https://github.com/mackt/pi-language-tutor/blob/main/docs/advanced.md)**
 
 ## Development
 
@@ -153,13 +162,15 @@ Skip heuristics, check vs tutor rules, bilingual card details, custom providers,
 npm install
 npm run check   # typecheck
 npm test        # unit tests
+npm run lint
+npm run fmt:check
 ```
 
 Layout, scripts, and how product screenshots are produced:
 
-→ **[docs/development.md](docs/development.md)**
+→ **[Development guide](https://github.com/mackt/pi-language-tutor/blob/main/docs/development.md)**
 
-Contributions welcome via PR. Conventions live in [AGENTS.md](AGENTS.md).
+Contributions welcome via PR. Conventions live in [AGENTS.md](https://github.com/mackt/pi-language-tutor/blob/main/AGENTS.md).
 
 ## License
 

@@ -5,9 +5,11 @@ Development section of README.md — read that first.
 
 ## Verify before pushing
 
-`npm run check` (typecheck) and `npm test` must both pass. When a change
-claims an improvement, put the measured evidence in the commit/PR body
-(e.g. `npm pack --dry-run` sizes, test counts) — not adjectives.
+`npm run check` (typecheck), `npm test`, `npm run lint`, and
+`npm run fmt:check` must all pass. Run `npm run fmt` to apply formatting
+before the final check. When a change claims an improvement, put the measured
+evidence in the commit/PR body (e.g. `npm pack --dry-run` sizes, test counts) —
+not adjectives.
 
 ## Branches, commits, PRs
 
@@ -46,9 +48,9 @@ runtime files outside `src/`, update it and sanity-check `npm pack --dry-run`.
 - `src/core.ts` stays pure: zero pi imports, no I/O — it is the unit-test
   surface (`test/core.test.ts`, run by vitest). New logic goes
   there when it doesn't need pi APIs.
-- Feature modules (`llm.ts`, `grammar.ts`, `translate.ts`, `settings.ts`)
-  keep one-way dependencies and expose minimal interfaces; `index.ts` stays
-  a thin composition root.
+- Feature modules (`llm.ts`, `grammar.ts`, `translate.ts`, `settings.ts`,
+  `flashcards.ts`, `learn.ts`) keep one-way dependencies and expose minimal
+  interfaces; `index.ts` stays a thin composition root.
 - Match pi ecosystem conventions before inventing UX: check the built-in
   commands and `examples/extensions/` in the pi repo (local checkout:
   `/Users/mack/code/agents/pi`) for the established pattern.

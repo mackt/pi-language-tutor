@@ -17,10 +17,10 @@ CJK prompts are counted by **characters**, not whitespace words, so a substantia
 
 A single LLM call inspects each prompt and picks a mode:
 
-| Prompt language | Panel | What it does |
-| --- | --- | --- |
-| Learning language | `✏ Writing check` | Spelling, grammar, phrasing + native-language notes + a natural whole-sentence rewrite |
-| Native (or other non-learning) language | `✏ Writing tutor` | Whole-sentence expression in the learning language, key vocabulary, and grammar |
+| Prompt language                         | Panel             | What it does                                                                           |
+| --------------------------------------- | ----------------- | -------------------------------------------------------------------------------------- |
+| Learning language                       | `✏ Writing check` | Spelling, grammar, phrasing + native-language notes + a natural whole-sentence rewrite |
+| Native (or other non-learning) language | `✏ Writing tutor` | Whole-sentence expression in the learning language, key vocabulary, and grammar        |
 
 The two are complementary and **never both fire** on the same prompt.
 
@@ -31,6 +31,18 @@ If you often write prompts in your native language on purpose and the tutor gets
 ```
 
 Native-language prompts then show no panel; the writing check keeps working for learning-language prompts.
+
+## Flashcards
+
+Words taught by the Writing tutor are captured automatically and deduplicated by word. Run `/flashcards` to open the review window, browse the library, or start a round of due cards.
+
+- Show the answer, then rate the card Again / Hard / Good / Easy.
+- Again and Hard keep the card in the current round; Good and Easy graduate it until its next due date.
+- Scheduling uses FSRS through `ts-fsrs`, with minute-level learning steps disabled so each rating moves directly to a day-level interval.
+- New cards are introduced up to a daily limit, and each study round has its own size limit. Both are editable from the review window.
+- Cards can be edited or deleted. Saves are atomic, and words captured while the review window is open are merged rather than overwritten.
+
+Cards are stored in `~/.pi/agent/flashcards.json`. `~/.pi/agent/flashcards-settings.json` stores `newPerDay`, `sessionLimit`, and `requestRetention` (the FSRS desired retention; editable in the file rather than the UI).
 
 ## Bilingual cards
 
