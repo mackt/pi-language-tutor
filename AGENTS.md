@@ -34,9 +34,10 @@ not adjectives.
 ## Releases
 
 1. From the latest `main`, create a branch named `chore/bump-version-X.Y.Z`.
-2. Run `npm version minor|patch --no-git-tag-version`, commit only
-   `package.json` and `package-lock.json` as `chore(pkg): bump version to X.Y.Z`,
-   then open and merge the version-bump PR.
+2. Run either `npm version minor --no-git-tag-version` or
+   `npm version patch --no-git-tag-version`. Commit only `package.json` and
+   `package-lock.json` as `chore(pkg): bump version to X.Y.Z`, then open and
+   merge the version-bump PR.
 3. Update local `main` to the merged commit, then create and push its annotated
    tag: `git tag -a vX.Y.Z -m "chore(release): X.Y.Z"` followed by
    `git push origin vX.Y.Z`.
