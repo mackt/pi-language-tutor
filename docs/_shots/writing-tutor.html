@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Writing tutor shot</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        width: 1642px;
+        height: 1169px;
+        overflow: hidden;
+        font-family:
+          'SF Mono', 'Menlo', 'Monaco', 'Cascadia Mono', 'Consolas', ui-monospace, monospace;
+      }
+      .bg {
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #ff876f 0%, #ff6b83 45%, #f974a0 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 72px 80px;
+      }
+      .window {
+        width: 100%;
+        max-width: 1280px;
+        background: #2b2d31;
+        border-radius: 18px;
+        box-shadow:
+          0 40px 80px rgba(0, 0, 0, 0.35),
+          0 0 0 1px rgba(255, 255, 255, 0.06);
+        overflow: hidden;
+        color: #d4d4d8;
+        font-size: 28px;
+        line-height: 1.45;
+      }
+      .user-msg {
+        padding: 28px 36px 22px;
+        color: #e8e8ec;
+        font-size: 30px;
+      }
+      .thought {
+        padding: 10px 36px;
+        color: #8b8d94;
+        font-style: italic;
+        font-size: 24px;
+      }
+      .tool {
+        margin: 18px 28px;
+        padding: 14px 22px;
+        background: #3a4a34;
+        border-radius: 10px;
+        color: #c5d4b8;
+        font-size: 24px;
+      }
+      .tool .cmd {
+        color: #a8c48a;
+      }
+      .tool .hint {
+        color: #7a8a70;
+      }
+      .working {
+        padding: 16px 36px 8px;
+        color: #8b8d94;
+        font-size: 24px;
+      }
+      .panel {
+        margin: 8px 0 0;
+        padding: 18px 36px 22px;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+      }
+      .title {
+        color: #7dd3c0;
+        font-weight: 700;
+        font-size: 28px;
+        margin-bottom: 10px;
+      }
+      .sentence {
+        color: #8fd99a;
+        font-size: 26px;
+        margin-bottom: 16px;
+      }
+      .sentence .dim {
+        color: #6b6e76;
+      }
+      .section {
+        color: #8b8d94;
+        font-size: 22px;
+        margin: 12px 0 6px;
+      }
+      .row {
+        font-size: 24px;
+        margin: 4px 0;
+      }
+      .word {
+        color: #7dd3c0;
+      }
+      .note {
+        color: #8b8d94;
+      }
+      .editor {
+        margin-top: 10px;
+        border-top: 2px solid #a78bfa;
+        background: #25272b;
+        padding: 18px 36px 28px;
+        min-height: 72px;
+      }
+      .caret {
+        display: inline-block;
+        width: 14px;
+        height: 28px;
+        background: #e8e8ec;
+        vertical-align: middle;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="bg">
+      <div class="window">
+        <div class="user-msg">我想重构这个函数但是不知道怎么下手</div>
+        <div class="thought">Identifying the target function and refactor options</div>
+        <div class="tool">
+          <span class="cmd">read</span> src/core.ts:1-80
+          <span class="hint"> (ctrl+o to expand)</span>
+        </div>
+        <div class="thought">Sketching a safer extraction path</div>
+        <div class="working">· Working…</div>
+        <div class="panel">
+          <div class="title">✏ Writing tutor</div>
+          <div class="sentence">
+            <span class="dim">◇</span>
+            I want to refactor this function but I'm not sure where to start.
+          </div>
+          <div class="section">Words</div>
+          <div class="row">
+            <span class="word">refactor</span>
+            <span class="note"> 重构代码结构，行为不变；比 rewrite 更精确。</span>
+          </div>
+          <div class="row">
+            <span class="word">where to start</span>
+            <span class="note"> 不知从何入手的自然说法。</span>
+          </div>
+          <div class="section">Grammar</div>
+          <div class="row">
+            <span class="word">want to + V</span>
+            <span class="note"> 表达意图；比 want + V-ing 更常用在这类请求里。</span>
+          </div>
+          <div class="row">
+            <span class="word">not sure where to…</span>
+            <span class="note"> 疑问词 + to 不定式，嵌在形容词后。</span>
+          </div>
+        </div>
+        <div class="editor"><span class="caret"></span></div>
+      </div>
+    </div>
+  </body>
+</html>
