@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/mackt/pi-language-tutor/main/docs/logo.png" width="96" height="96" alt="pi-language-tutor logo" />
-</p>
-
 # pi-language-tutor
 
 <p align="center">
@@ -19,10 +15,6 @@
 
 <p align="center">
   English · <a href="README.zh-CN.md">简体中文</a>
-</p>
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/mackt/pi-language-tutor/main/docs/demo.gif" width="720" alt="Demo: Writing check, Writing tutor, and bilingual translation panels" />
 </p>
 
 ## Install
