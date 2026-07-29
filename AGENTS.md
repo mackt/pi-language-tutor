@@ -5,9 +5,11 @@ Development section of README.md — read that first.
 
 ## Verify before pushing
 
-`npm run check` (typecheck) and `npm test` must both pass. When a change
-claims an improvement, put the measured evidence in the commit/PR body
-(e.g. `npm pack --dry-run` sizes, test counts) — not adjectives.
+`npm run check` (typecheck), `npm test`, `npm run lint`, and
+`npm run fmt:check` must all pass. Run `npm run fmt` to apply formatting
+before the final check. When a change claims an improvement, put the measured
+evidence in the commit/PR body (e.g. `npm pack --dry-run` sizes, test counts) —
+not adjectives.
 
 ## Branches, commits, PRs
 
