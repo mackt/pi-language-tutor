@@ -35,18 +35,49 @@ export interface TranslateDeps {
 export function registerTranslation(pi: ExtensionAPI, deps: TranslateDeps): void {
   let lastAutoKey: string | undefined
 
-  pi.registerEntryRenderer<TranslationCard>(ENTRY_TYPE, (entry, _options, theme) => {
-    const data = entry.data
+  // omp renamed registerEntryRenderer -> registerMessageRenderer (same renderer
+  // contract: receives the entry, options, and theme, returns a Component).
+  type RenderTheme = {
+    bg(color: string, text: string): string
+    fg(color: string, text: string): string
+    bold(text: string): string
+  }
+  const cardRenderer = (data: TranslationCard | undefined, theme: RenderTheme | undefined) => {
     if (!data) return undefined
     const markdown = data.segments ? cardMarkdown(data.segments) : data.text
     if (!markdown) return undefined
-    const box = new Box(1, 0, (t) => theme.bg('customMessageBg', t))
+    const box = new Box(1, 0, (t) => theme?.bg('customMessageBg', t) ?? t)
     box.addChild(
-      new Text(theme.fg('accent', theme.bold(`🌐 ${translationLabel(data.native)}`)), 0, 0)
+      new Text(
+        theme?.fg('accent', theme.bold(`🌐 ${translationLabel(data.native)}`)) ??
+          `🌐 ${translationLabel(data.native)}`,
+        0,
+        0
+      )
     )
     box.addChild(new Markdown(markdown, 0, 0, getMarkdownTheme()))
     return box
-  })
+  }
+  // ExtensionAPI's type lacks registerMessageRenderer, so probing `in pi`
+  // would narrow pi to never. Widen to an untyped record first — runtime
+  // detection only; both branches dispatch to the real, typed methods.
+  const runtime = pi as unknown as Record<string, unknown>
+  const isOmp = typeof runtime.registerMessageRenderer === 'function'
+  if (isOmp) {
+    const omp = pi as {
+      registerMessageRenderer<T>(
+        type: string,
+        r: (entry: { data?: T }, opts: unknown, theme: RenderTheme | undefined) => unknown
+      ): void
+    }
+    omp.registerMessageRenderer<TranslationCard>(ENTRY_TYPE, (entry, _opts, theme) =>
+      cardRenderer(entry.data, theme)
+    )
+  } else {
+    pi.registerEntryRenderer<TranslationCard>(ENTRY_TYPE, (entry, _opts, theme) =>
+      cardRenderer(entry.data, theme)
+    )
+  }
 
   const lastAssistantText = (ctx: ExtensionContext): string | undefined => {
     const branch = ctx.sessionManager.getBranch()
@@ -188,18 +219,54 @@ export function registerTranslation(pi: ExtensionAPI, deps: TranslateDeps): void
     handler: async (_args, ctx) => translateLast(ctx)
   })
 
-  pi.on('agent_settled', (_event, ctx) => {
-    if (!ctx.hasUI || ctx.mode !== 'tui') return
-    const cfg = loadConfig()
-    if (!cfg.auto) return
-
-    const text = lastAssistantText(ctx)
+  const maybeAutoTranslate = (ctx: ExtensionContext, text: string | undefined): void => {
     if (!text || text.split(/\s+/).filter(Boolean).length < MIN_AUTO_WORDS) return
-
     const key = text.slice(0, 200)
     if (key === lastAutoKey) return
     lastAutoKey = key
-
     void translateLast(ctx, { auto: true })
-  })
+  }
+
+  if (isOmp) {
+    // omp: 'agent_settled' does not exist and 'agent_end' fires before the
+    // assistant reply lands in getBranch(); 'turn_end' carries the committed
+    // reply as `event.message`.
+    pi.on('turn_end', (event, ctx) => {
+      if (!ctx.hasUI || ctx.mode !== 'tui') return
+      if (!loadConfig().auto) return
+      const message = 'message' in event ? event.message : undefined
+      maybeAutoTranslate(ctx, assistantText(message))
+    })
+  } else {
+    pi.on('agent_settled', (_event, ctx) => {
+      if (!ctx.hasUI || ctx.mode !== 'tui') return
+      if (!loadConfig().auto) return
+      maybeAutoTranslate(ctx, lastAssistantText(ctx))
+    })
+  }
+
+  function assistantText(message: unknown): string | undefined {
+    if (!message || typeof message !== 'object' || !('role' in message)) return undefined
+    const role = message.role
+    if (role !== 'assistant' || !('content' in message)) return undefined
+    const content = message.content
+    if (!Array.isArray(content)) return undefined
+    const text = content
+      .filter((c): c is { type: 'text'; text: string } => isTextSegment(c))
+      .map((c) => c.text)
+      .join('\n')
+      .trim()
+    return text.length > 0 ? text : undefined
+  }
+}
+
+function isTextSegment(c: unknown): c is { type: 'text'; text: string } {
+  return (
+    c !== null &&
+    typeof c === 'object' &&
+    'type' in c &&
+    c.type === 'text' &&
+    'text' in c &&
+    typeof c.text === 'string'
+  )
 }

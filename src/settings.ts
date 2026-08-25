@@ -499,8 +499,16 @@ export function registerLangSettings(pi: ExtensionAPI, deps: SettingsDeps): void
     warnOnCacheMismatch(ctx, cfg)
   })
 
-  // Switching the session model mid-session (/model) can also create the mismatch.
-  pi.on('model_select', (_event, ctx) => {
+  // omp has no 'model_select'; 'agent_start' precedes the next agent turn.
+  // Widen pi to a record for runtime detection; see translate.ts for why.
+  const runtime = pi as unknown as Record<string, unknown>
+  const isOmp = typeof runtime.registerMessageRenderer === 'function'
+  const warnOnModelChange = (ctx: ExtensionContext): void => {
     warnOnCacheMismatch(ctx, loadConfig())
-  })
+  }
+  if (isOmp) {
+    pi.on('agent_start', (_event, ctx) => warnOnModelChange(ctx))
+  } else {
+    pi.on('model_select', (_event, ctx) => warnOnModelChange(ctx))
+  }
 }
