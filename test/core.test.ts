@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  assistantMessageText,
+  finalAssistantReplyText,
   shouldSkipCheck,
   parseReviewResult,
   buildReviewPrompt,
@@ -259,6 +261,99 @@ describe('cardMarkdown', () => {
   })
   it('replaces long code with a placeholder', () => {
     expect(card).toContain('*[code block ↑ 23 lines]*')
+  })
+})
+
+describe('assistantMessageText', () => {
+  it('joins text segments and trims', () => {
+    const message = {
+      role: 'assistant',
+      content: [
+        { type: 'thinking', thinking: 'hmm' },
+        { type: 'text', text: '  Hello ' },
+        { type: 'text', text: 'world.\n' }
+      ]
+    }
+    expect(assistantMessageText(message)).toBe('Hello \nworld.')
+  })
+
+  it('ignores non-assistant messages', () => {
+    expect(assistantMessageText({ role: 'user', content: [{ type: 'text', text: 'hi' }] })).toBe(
+      undefined
+    )
+    expect(
+      assistantMessageText({ role: 'toolResult', content: [{ type: 'text', text: 'ok' }] })
+    ).toBe(undefined)
+  })
+
+  it('returns undefined for malformed or empty messages', () => {
+    expect(assistantMessageText(undefined)).toBe(undefined)
+    expect(assistantMessageText(null)).toBe(undefined)
+    expect(assistantMessageText('text')).toBe(undefined)
+    expect(assistantMessageText({ role: 'assistant' })).toBe(undefined)
+    expect(assistantMessageText({ role: 'assistant', content: 'plain string' })).toBe(undefined)
+    expect(assistantMessageText({ role: 'assistant', content: [] })).toBe(undefined)
+    expect(
+      assistantMessageText({ role: 'assistant', content: [{ type: 'text', text: '  ' }] })
+    ).toBe(undefined)
+    expect(
+      assistantMessageText({ role: 'assistant', content: [{ type: 'text', text: 42 }, null] })
+    ).toBe(undefined)
+  })
+
+  it('still extracts text from a tool-call turn', () => {
+    const message = {
+      role: 'assistant',
+      stopReason: 'toolUse',
+      content: [
+        { type: 'text', text: 'Let me look.' },
+        { type: 'toolCall', id: '1', name: 'read', arguments: {} }
+      ]
+    }
+    expect(assistantMessageText(message)).toBe('Let me look.')
+  })
+})
+
+describe('finalAssistantReplyText', () => {
+  it('returns the text of a final reply', () => {
+    const message = {
+      role: 'assistant',
+      stopReason: 'stop',
+      content: [{ type: 'text', text: 'All done.' }]
+    }
+    expect(finalAssistantReplyText(message)).toBe('All done.')
+  })
+
+  it('accepts messages without a stopReason', () => {
+    expect(
+      finalAssistantReplyText({ role: 'assistant', content: [{ type: 'text', text: 'Done.' }] })
+    ).toBe('Done.')
+  })
+
+  it('skips intermediate turns that continue with tool calls', () => {
+    expect(
+      finalAssistantReplyText({
+        role: 'assistant',
+        stopReason: 'toolUse',
+        content: [{ type: 'text', text: 'Let me check that file for you first.' }]
+      })
+    ).toBe(undefined)
+    expect(
+      finalAssistantReplyText({
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 'Let me check that file for you first.' },
+          { type: 'toolCall', id: '1', name: 'read', arguments: {} }
+        ]
+      })
+    ).toBe(undefined)
+  })
+
+  it('returns undefined for non-assistant or malformed input', () => {
+    expect(finalAssistantReplyText({ role: 'user', content: [{ type: 'text', text: 'hi' }] })).toBe(
+      undefined
+    )
+    expect(finalAssistantReplyText(undefined)).toBe(undefined)
   })
 })
 

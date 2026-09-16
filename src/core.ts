@@ -369,6 +369,44 @@ export function cardMarkdown(segments: CardSegment[]): string {
     .join('\n\n')
 }
 
+/**
+ * Concatenated text of an assistant message — a session entry's message or an
+ * event payload, any shape. Undefined for other roles or when it has no text.
+ */
+export function assistantMessageText(message: unknown): string | undefined {
+  if (!isRecord(message) || message.role !== 'assistant') return undefined
+  const content = message.content
+  if (!Array.isArray(content)) return undefined
+  const text = content
+    .filter(
+      (c): c is { type: 'text'; text: string } =>
+        isRecord(c) && c.type === 'text' && typeof c.text === 'string'
+    )
+    .map((c) => c.text)
+    .join('\n')
+    .trim()
+  return text.length > 0 ? text : undefined
+}
+
+/**
+ * Text of a *final* assistant reply. Undefined when the message continues
+ * with tool calls: that is an intermediate agent turn, and translating it
+ * would add a card (and a billed side-call) at every step of a tool-using
+ * conversation.
+ */
+export function finalAssistantReplyText(message: unknown): string | undefined {
+  if (!isRecord(message) || message.stopReason === 'toolUse') return undefined
+  const content = message.content
+  if (Array.isArray(content) && content.some((c) => isRecord(c) && c.type === 'toolCall')) {
+    return undefined
+  }
+  return assistantMessageText(message)
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
 /** The subset of a registry model a reference can be matched against. */
 export interface ModelRefLike {
   provider: string

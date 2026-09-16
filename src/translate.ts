@@ -10,10 +10,12 @@ import { Box, Markdown, Text } from '@earendil-works/pi-tui'
 import { loadConfig } from './config.ts'
 import type { CardSegment, Config, Segment, TranslationCard } from './core.ts'
 import {
+  assistantMessageText,
   buildSegmentPrompt,
   buildWholeTranslatePrompt,
   cardMarkdown,
   extractJson,
+  finalAssistantReplyText,
   MAX_TRANSLATE_CHARS,
   MIN_AUTO_WORDS,
   segmentMarkdown,
@@ -82,19 +84,10 @@ export function registerTranslation(pi: ExtensionAPI, deps: TranslateDeps): void
   const lastAssistantText = (ctx: ExtensionContext): string | undefined => {
     const branch = ctx.sessionManager.getBranch()
     for (let i = branch.length - 1; i >= 0; i--) {
-      const entry = branch[i] as { type: string; message?: { role?: string; content?: unknown } }
-      if (entry.type !== 'message' || entry.message?.role !== 'assistant') continue
-      const content = entry.message.content
-      if (!Array.isArray(content)) continue
-      const text = content
-        .filter(
-          (c): c is { type: 'text'; text: string } =>
-            c?.type === 'text' && typeof c.text === 'string'
-        )
-        .map((c) => c.text)
-        .join('\n')
-        .trim()
-      if (text.length > 0) return text
+      const entry = branch[i] as { type: string; message?: unknown }
+      if (entry.type !== 'message') continue
+      const text = assistantMessageText(entry.message)
+      if (text) return text
     }
     return undefined
   }
@@ -142,14 +135,21 @@ export function registerTranslation(pi: ExtensionAPI, deps: TranslateDeps): void
     })
   }
 
-  const translateLast = async (ctx: ExtensionContext, opts?: { auto?: boolean }) => {
+  /**
+   * Translate `opts.source`, or the last assistant message on the branch when
+   * the caller has no text in hand (alt+t, /translate).
+   */
+  const translateLast = async (
+    ctx: ExtensionContext,
+    opts?: { auto?: boolean; source?: string }
+  ) => {
     if (!ctx.hasUI) return
     const cfg = loadConfig()
     const notify = (msg: string) => {
       if (!opts?.auto) ctx.ui.notify(msg, 'warning')
     }
 
-    const source = lastAssistantText(ctx)
+    const source = opts?.source ?? lastAssistantText(ctx)
     if (!source) {
       notify('No assistant message to translate')
       return
@@ -224,18 +224,19 @@ export function registerTranslation(pi: ExtensionAPI, deps: TranslateDeps): void
     const key = text.slice(0, 200)
     if (key === lastAutoKey) return
     lastAutoKey = key
-    void translateLast(ctx, { auto: true })
+    // Hand the text over: on omp it is not on the branch yet (see below).
+    void translateLast(ctx, { auto: true, source: text })
   }
 
   if (isOmp) {
     // omp: 'agent_settled' does not exist and 'agent_end' fires before the
     // assistant reply lands in getBranch(); 'turn_end' carries the committed
-    // reply as `event.message`.
+    // reply as `event.message`. It fires on every agent turn, so intermediate
+    // tool-call turns are filtered out and only the final reply is translated.
     pi.on('turn_end', (event, ctx) => {
       if (!ctx.hasUI || ctx.mode !== 'tui') return
       if (!loadConfig().auto) return
-      const message = 'message' in event ? event.message : undefined
-      maybeAutoTranslate(ctx, assistantText(message))
+      maybeAutoTranslate(ctx, finalAssistantReplyText(event.message))
     })
   } else {
     pi.on('agent_settled', (_event, ctx) => {
@@ -244,29 +245,4 @@ export function registerTranslation(pi: ExtensionAPI, deps: TranslateDeps): void
       maybeAutoTranslate(ctx, lastAssistantText(ctx))
     })
   }
-
-  function assistantText(message: unknown): string | undefined {
-    if (!message || typeof message !== 'object' || !('role' in message)) return undefined
-    const role = message.role
-    if (role !== 'assistant' || !('content' in message)) return undefined
-    const content = message.content
-    if (!Array.isArray(content)) return undefined
-    const text = content
-      .filter((c): c is { type: 'text'; text: string } => isTextSegment(c))
-      .map((c) => c.text)
-      .join('\n')
-      .trim()
-    return text.length > 0 ? text : undefined
-  }
-}
-
-function isTextSegment(c: unknown): c is { type: 'text'; text: string } {
-  return (
-    c !== null &&
-    typeof c === 'object' &&
-    'type' in c &&
-    c.type === 'text' &&
-    'text' in c &&
-    typeof c.text === 'string'
-  )
 }
