@@ -134,6 +134,10 @@ export interface SettingsDeps {
   disableReview(ctx: ExtensionContext): void
 }
 
+function sessionModelKey(ctx: ExtensionContext): string | undefined {
+  return ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined
+}
+
 /** Register the /lang command, its settings menu, and the session_start status/warning. */
 export function registerLangSettings(pi: ExtensionAPI, deps: SettingsDeps): void {
   /** Apply the review mode; shared by the menu and the direct command. */
@@ -493,22 +497,32 @@ export function registerLangSettings(pi: ExtensionAPI, deps: SettingsDeps): void
     }
   })
 
+  let lastSeenModel: string | undefined
+
   pi.on('session_start', (_event, ctx) => {
     const cfg = loadConfig()
+    lastSeenModel = sessionModelKey(ctx)
     updateStatus(ctx, cfg)
     warnOnCacheMismatch(ctx, cfg)
   })
 
-  // omp has no 'model_select'; 'agent_start' precedes the next agent turn.
+  // Switching the session model mid-session (/model) can also create the
+  // mismatch. omp has no 'model_select'; the closest signal is 'agent_start',
+  // which fires before *every* agent turn, so only warn when the session model
+  // actually changed since it was last seen.
   // Widen pi to a record for runtime detection; see translate.ts for why.
   const runtime = pi as unknown as Record<string, unknown>
   const isOmp = typeof runtime.registerMessageRenderer === 'function'
-  const warnOnModelChange = (ctx: ExtensionContext): void => {
-    warnOnCacheMismatch(ctx, loadConfig())
-  }
   if (isOmp) {
-    pi.on('agent_start', (_event, ctx) => warnOnModelChange(ctx))
+    pi.on('agent_start', (_event, ctx) => {
+      const current = sessionModelKey(ctx)
+      if (current === lastSeenModel) return
+      lastSeenModel = current
+      warnOnCacheMismatch(ctx, loadConfig())
+    })
   } else {
-    pi.on('model_select', (_event, ctx) => warnOnModelChange(ctx))
+    pi.on('model_select', (_event, ctx) => {
+      warnOnCacheMismatch(ctx, loadConfig())
+    })
   }
 }
