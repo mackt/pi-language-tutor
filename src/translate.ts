@@ -10,10 +10,12 @@ import { Box, Markdown, Text } from '@earendil-works/pi-tui'
 import { loadConfig } from './config.ts'
 import type { CardSegment, Config, Segment, TranslationCard } from './core.ts'
 import {
+  assistantMessageText,
   buildSegmentPrompt,
   buildWholeTranslatePrompt,
   cardMarkdown,
   extractJson,
+  finalAssistantReplyText,
   MAX_TRANSLATE_CHARS,
   MIN_AUTO_WORDS,
   segmentMarkdown,
@@ -35,35 +37,57 @@ export interface TranslateDeps {
 export function registerTranslation(pi: ExtensionAPI, deps: TranslateDeps): void {
   let lastAutoKey: string | undefined
 
-  pi.registerEntryRenderer<TranslationCard>(ENTRY_TYPE, (entry, _options, theme) => {
-    const data = entry.data
+  // omp renamed registerEntryRenderer -> registerMessageRenderer (same renderer
+  // contract: receives the entry, options, and theme, returns a Component).
+  type RenderTheme = {
+    bg(color: string, text: string): string
+    fg(color: string, text: string): string
+    bold(text: string): string
+  }
+  const cardRenderer = (data: TranslationCard | undefined, theme: RenderTheme | undefined) => {
     if (!data) return undefined
     const markdown = data.segments ? cardMarkdown(data.segments) : data.text
     if (!markdown) return undefined
-    const box = new Box(1, 0, (t) => theme.bg('customMessageBg', t))
+    const box = new Box(1, 0, (t) => theme?.bg('customMessageBg', t) ?? t)
     box.addChild(
-      new Text(theme.fg('accent', theme.bold(`🌐 ${translationLabel(data.native)}`)), 0, 0)
+      new Text(
+        theme?.fg('accent', theme.bold(`🌐 ${translationLabel(data.native)}`)) ??
+          `🌐 ${translationLabel(data.native)}`,
+        0,
+        0
+      )
     )
     box.addChild(new Markdown(markdown, 0, 0, getMarkdownTheme()))
     return box
-  })
+  }
+  // ExtensionAPI's type lacks registerMessageRenderer, so probing `in pi`
+  // would narrow pi to never. Widen to an untyped record first — runtime
+  // detection only; both branches dispatch to the real, typed methods.
+  const runtime = pi as unknown as Record<string, unknown>
+  const isOmp = typeof runtime.registerMessageRenderer === 'function'
+  if (isOmp) {
+    const omp = pi as {
+      registerMessageRenderer<T>(
+        type: string,
+        r: (entry: { data?: T }, opts: unknown, theme: RenderTheme | undefined) => unknown
+      ): void
+    }
+    omp.registerMessageRenderer<TranslationCard>(ENTRY_TYPE, (entry, _opts, theme) =>
+      cardRenderer(entry.data, theme)
+    )
+  } else {
+    pi.registerEntryRenderer<TranslationCard>(ENTRY_TYPE, (entry, _opts, theme) =>
+      cardRenderer(entry.data, theme)
+    )
+  }
 
   const lastAssistantText = (ctx: ExtensionContext): string | undefined => {
     const branch = ctx.sessionManager.getBranch()
     for (let i = branch.length - 1; i >= 0; i--) {
-      const entry = branch[i] as { type: string; message?: { role?: string; content?: unknown } }
-      if (entry.type !== 'message' || entry.message?.role !== 'assistant') continue
-      const content = entry.message.content
-      if (!Array.isArray(content)) continue
-      const text = content
-        .filter(
-          (c): c is { type: 'text'; text: string } =>
-            c?.type === 'text' && typeof c.text === 'string'
-        )
-        .map((c) => c.text)
-        .join('\n')
-        .trim()
-      if (text.length > 0) return text
+      const entry = branch[i] as { type: string; message?: unknown }
+      if (entry.type !== 'message') continue
+      const text = assistantMessageText(entry.message)
+      if (text) return text
     }
     return undefined
   }
@@ -111,14 +135,21 @@ export function registerTranslation(pi: ExtensionAPI, deps: TranslateDeps): void
     })
   }
 
-  const translateLast = async (ctx: ExtensionContext, opts?: { auto?: boolean }) => {
+  /**
+   * Translate `opts.source`, or the last assistant message on the branch when
+   * the caller has no text in hand (alt+t, /translate).
+   */
+  const translateLast = async (
+    ctx: ExtensionContext,
+    opts?: { auto?: boolean; source?: string }
+  ) => {
     if (!ctx.hasUI) return
     const cfg = loadConfig()
     const notify = (msg: string) => {
       if (!opts?.auto) ctx.ui.notify(msg, 'warning')
     }
 
-    const source = lastAssistantText(ctx)
+    const source = opts?.source ?? lastAssistantText(ctx)
     if (!source) {
       notify('No assistant message to translate')
       return
@@ -188,18 +219,30 @@ export function registerTranslation(pi: ExtensionAPI, deps: TranslateDeps): void
     handler: async (_args, ctx) => translateLast(ctx)
   })
 
-  pi.on('agent_settled', (_event, ctx) => {
-    if (!ctx.hasUI || ctx.mode !== 'tui') return
-    const cfg = loadConfig()
-    if (!cfg.auto) return
-
-    const text = lastAssistantText(ctx)
+  const maybeAutoTranslate = (ctx: ExtensionContext, text: string | undefined): void => {
     if (!text || text.split(/\s+/).filter(Boolean).length < MIN_AUTO_WORDS) return
-
     const key = text.slice(0, 200)
     if (key === lastAutoKey) return
     lastAutoKey = key
+    // Hand the text over: on omp it is not on the branch yet (see below).
+    void translateLast(ctx, { auto: true, source: text })
+  }
 
-    void translateLast(ctx, { auto: true })
-  })
+  if (isOmp) {
+    // omp: 'agent_settled' does not exist and 'agent_end' fires before the
+    // assistant reply lands in getBranch(); 'turn_end' carries the committed
+    // reply as `event.message`. It fires on every agent turn, so intermediate
+    // tool-call turns are filtered out and only the final reply is translated.
+    pi.on('turn_end', (event, ctx) => {
+      if (!ctx.hasUI || ctx.mode !== 'tui') return
+      if (!loadConfig().auto) return
+      maybeAutoTranslate(ctx, finalAssistantReplyText(event.message))
+    })
+  } else {
+    pi.on('agent_settled', (_event, ctx) => {
+      if (!ctx.hasUI || ctx.mode !== 'tui') return
+      if (!loadConfig().auto) return
+      maybeAutoTranslate(ctx, lastAssistantText(ctx))
+    })
+  }
 }
