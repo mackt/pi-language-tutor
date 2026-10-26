@@ -19,6 +19,8 @@
 
 ## 安装
 
+已在 Pi 1.0.0 上验证。
+
 ```sh
 pi install npm:pi-language-tutor
 ```

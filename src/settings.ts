@@ -16,7 +16,7 @@ import {
   Text
 } from '@earendil-works/pi-tui'
 import { loadConfig, saveConfig } from './config.ts'
-import { resolveModelReference, resolveStoredModelReference } from './core.ts'
+import { isOmpRuntime, resolveModelReference, resolveStoredModelReference } from './core.ts'
 import type { Config } from './core.ts'
 
 export const STATUS_KEY = 'language-learn'
@@ -510,9 +510,7 @@ export function registerLangSettings(pi: ExtensionAPI, deps: SettingsDeps): void
   // mismatch. omp has no 'model_select'; the closest signal is 'agent_start',
   // which fires before *every* agent turn, so only warn when the session model
   // actually changed since it was last seen.
-  // Widen pi to a record for runtime detection; see translate.ts for why.
-  const runtime = pi as unknown as Record<string, unknown>
-  const isOmp = typeof runtime.registerMessageRenderer === 'function'
+  const isOmp = isOmpRuntime(pi)
   if (isOmp) {
     pi.on('agent_start', (_event, ctx) => {
       const current = sessionModelKey(ctx)

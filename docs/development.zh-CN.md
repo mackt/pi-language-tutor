@@ -17,13 +17,15 @@ ln -s "$(pwd)" ~/.pi/agent/extensions/pi-language-tutor
 
 ```sh
 npm run check      # 类型检查（tsc --noEmit）
-npm test           # 单元测试（vitest）：核心行为与记忆卡片调度
+npm test           # tests (vitest)
 npm run lint       # oxlint
 npm run fmt        # oxfmt
 npm run fmt:check  # 格式检查（CI）
 ```
 
 开 PR 前，`npm run check`、`npm test`、`npm run lint` 与 `npm run fmt:check` 必须全部通过（见 [AGENTS.md](../AGENTS.md)）。
+
+`test/llm.test.ts` 和 `test/extension.test.ts` 通过 Pi 1.0.0 的模型运行时与扩展加载器验证集成行为。测试使用 SDK 提供的离线 faux provider、内存凭据和临时主目录，不调用模型 API，也不修改用户配置。
 
 ## 目录
 

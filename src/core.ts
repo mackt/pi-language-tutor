@@ -119,6 +119,20 @@ export function translationLabel(native: string): string {
   return TRANSLATION_LABELS[native.split('-')[0].toLowerCase()] ?? 'Translation'
 }
 
+/**
+ * omp renders custom entries through `registerMessageRenderer` and has no
+ * `registerEntryRenderer`. Pi 1.0 exposes both, and pi before 0.80.4 has
+ * neither, so require the omp shape explicitly instead of inferring it from
+ * a missing method.
+ */
+export function isOmpRuntime(api: unknown): boolean {
+  const runtime = api as Record<string, unknown>
+  return (
+    typeof runtime.registerMessageRenderer === 'function' &&
+    typeof runtime.registerEntryRenderer !== 'function'
+  )
+}
+
 export function extractJson<T>(raw: string): T | undefined {
   const start = raw.indexOf('{')
   const end = raw.lastIndexOf('}')

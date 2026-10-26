@@ -10,6 +10,7 @@ import { Box, Markdown, Text } from '@earendil-works/pi-tui'
 import { loadConfig } from './config.ts'
 import type { CardSegment, Config, Segment, TranslationCard } from './core.ts'
 import {
+  isOmpRuntime,
   assistantMessageText,
   buildSegmentPrompt,
   buildWholeTranslatePrompt,
@@ -60,11 +61,7 @@ export function registerTranslation(pi: ExtensionAPI, deps: TranslateDeps): void
     box.addChild(new Markdown(markdown, 0, 0, getMarkdownTheme()))
     return box
   }
-  // ExtensionAPI's type lacks registerMessageRenderer, so probing `in pi`
-  // would narrow pi to never. Widen to an untyped record first — runtime
-  // detection only; both branches dispatch to the real, typed methods.
-  const runtime = pi as unknown as Record<string, unknown>
-  const isOmp = typeof runtime.registerMessageRenderer === 'function'
+  const isOmp = isOmpRuntime(pi)
   if (isOmp) {
     const omp = pi as {
       registerMessageRenderer<T>(

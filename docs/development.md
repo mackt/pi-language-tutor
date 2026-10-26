@@ -17,13 +17,15 @@ There is no build step: pi loads TypeScript directly via the `pi.extensions` fie
 
 ```sh
 npm run check      # typecheck (tsc --noEmit)
-npm test           # unit tests (vitest): core behavior and flashcard scheduling
+npm test           # tests (vitest)
 npm run lint       # oxlint
 npm run fmt        # oxfmt
 npm run fmt:check  # format check (CI)
 ```
 
 `npm run check`, `npm test`, `npm run lint`, and `npm run fmt:check` must all pass before opening a PR (see [AGENTS.md](../AGENTS.md)).
+
+`test/llm.test.ts` and `test/extension.test.ts` exercise Pi 1.0.0 through its model runtime and extension loader. They use the SDK's offline faux provider, in-memory credentials, and a temporary home directory. No model API calls or user configuration changes are required.
 
 ## Layout
 

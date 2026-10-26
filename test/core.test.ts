@@ -24,6 +24,7 @@ import {
 } from '../src/llm.ts'
 import type { ProviderRegistry, RegisteredProviderConfigRegistry } from '../src/llm.ts'
 import { warnOnCacheMismatch } from '../src/settings.ts'
+import { isOmpRuntime } from '../src/core.ts'
 
 describe('shouldSkipCheck', () => {
   describe('inputs that must be skipped', () => {
@@ -822,5 +823,22 @@ describe('slash-containing refs follow pi CLI semantics (OpenRouter-style ids)',
   })
   it('a bare id that lost auth everywhere still resolves from the catalog (fails visibly later)', () => {
     expect(resolveModel(ctx([session]), lang('gpt-4o-mini') as never)).toBe(openai)
+  })
+})
+
+const fn = () => {}
+
+describe('isOmpRuntime', () => {
+  it('detects omp: message renderer without entry renderer', () => {
+    expect(isOmpRuntime({ registerMessageRenderer: fn })).toBe(true)
+  })
+  it('treats pi 1.0 with both renderer APIs as pi', () => {
+    expect(isOmpRuntime({ registerMessageRenderer: fn, registerEntryRenderer: fn })).toBe(false)
+  })
+  it('treats pi 0.8x with only the entry renderer as pi', () => {
+    expect(isOmpRuntime({ registerEntryRenderer: fn })).toBe(false)
+  })
+  it('does not mistake a runtime with neither API for omp', () => {
+    expect(isOmpRuntime({})).toBe(false)
   })
 })
