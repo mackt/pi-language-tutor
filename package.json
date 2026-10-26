@@ -36,7 +36,7 @@
     "@earendil-works/pi-coding-agent": "^1.0.0",
     "@earendil-works/pi-tui": "^1.0.0",
     "@types/node": "^26.1.1",
-    "oxfmt": "0.42.0",
+    "oxfmt": "0.74.0",
     "oxlint": "1.63.0",
     "typescript": "^5.7.0",
     "vitest": "^4.1.10"
