@@ -146,7 +146,7 @@ Flashcards are stored in `~/.pi/agent/flashcards.json`. Review limits and FSRS d
 
 ## Advanced
 
-Skip heuristics, check vs tutor rules, flashcard scheduling, bilingual card details, custom providers, and context-mode cost trade-offs:
+Skip heuristics, check vs tutor rules, flashcard scheduling, bilingual card details, custom providers, context-mode cost trade-offs, and review events for other extensions:
 
 → **[Advanced behavior](https://github.com/mackt/pi-language-tutor/blob/main/docs/advanced.md)**
 

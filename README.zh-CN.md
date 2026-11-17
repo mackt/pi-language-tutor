@@ -146,7 +146,7 @@ agent 回复后按 `alt+t`（macOS 上是 ⌥T）或运行 `/translate`。每个
 
 ## 进阶
 
-跳过规则、check / tutor 分工、记忆卡片调度、双语卡片细节、自定义 provider，以及上下文模式的成本权衡：
+跳过规则、check / tutor 分工、记忆卡片调度、双语卡片细节、自定义 provider、上下文模式的成本权衡，以及供其他扩展使用的检查结果事件：
 
 → **[进阶说明](https://github.com/mackt/pi-language-tutor/blob/main/docs/advanced.zh-CN.md)**
 

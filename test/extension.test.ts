@@ -16,8 +16,10 @@ import {
   SessionManager,
   SettingsManager
 } from '@earendil-works/pi-coding-agent'
-import type { AgentSession } from '@earendil-works/pi-coding-agent'
+import type { AgentSession, ExtensionAPI } from '@earendil-works/pi-coding-agent'
 import languageTutor from '../language-learn.ts'
+import { REVIEW_EVENT } from '../src/grammar.ts'
+import type { ReviewEvent } from '../src/grammar.ts'
 
 const { testHome } = await vi.hoisted(async () => {
   const tempFs = await import('node:fs')
@@ -36,6 +38,18 @@ vi.mock('node:os', async (importOriginal) => {
 let session: AgentSession
 let faux: FauxProviderHandle
 let notifications: string[]
+let widgets: Map<string, unknown>
+let reviews: ReviewEvent[]
+let claimReviews: boolean
+
+/** Stands in for another extension that shows reviews somewhere else. */
+function reviewListener(pi: ExtensionAPI): void {
+  pi.events.on(REVIEW_EVENT, (data) => {
+    const event = data as ReviewEvent
+    reviews.push({ ...event })
+    if (claimReviews) event.handled = true
+  })
+}
 
 beforeEach(async () => {
   fs.rmSync(path.join(testHome, '.pi'), { recursive: true, force: true })
@@ -56,7 +70,7 @@ beforeEach(async () => {
     cwd: testHome,
     agentDir,
     settingsManager: settings,
-    extensionFactories: [languageTutor],
+    extensionFactories: [languageTutor, reviewListener],
     noExtensions: true,
     noSkills: true,
     noPromptTemplates: true,
@@ -79,12 +93,16 @@ beforeEach(async () => {
     throw new Error(`Extension load failed: ${JSON.stringify(result.extensionsResult.errors)}`)
   }
   notifications = []
+  widgets = new Map()
+  reviews = []
+  claimReviews = false
   initTheme('dark', false)
   await session.bindExtensions({
     mode: 'tui',
     uiContext: {
       ...session.extensionRunner.getUIContext(),
-      notify: (message) => notifications.push(message)
+      notify: (message) => notifications.push(message),
+      setWidget: (key: string, content: unknown) => widgets.set(key, content)
     }
   })
 })
@@ -178,4 +196,50 @@ it('replays the session prompt and request prefix when translating with context'
     ['system', 'user'],
     ['system', 'user', 'user']
   ])
+})
+
+const checkReply = JSON.stringify({
+  mode: 'check',
+  items: [{ wrong: 'teh', right: 'the', reason: 'typo' }],
+  rephrase: 'Please fix the bug in the parser.'
+})
+
+async function review(prompt: string): Promise<void> {
+  await session.extensionRunner.emitInput(prompt, undefined, 'interactive')
+  await expect.poll(() => reviews).toHaveLength(1)
+}
+
+it('emits each review and still shows the widget when nobody claims it', async () => {
+  faux.setResponses([fauxAssistantMessage(checkReply)])
+
+  await review('Please fix teh bug in the parser.')
+
+  expect(reviews[0]).toEqual({
+    kind: 'check',
+    prompt: 'Please fix teh bug in the parser.',
+    items: [{ wrong: 'teh', right: 'the', reason: 'typo' }],
+    rephrase: 'Please fix the bug in the parser.',
+    handled: false
+  })
+  expect(widgets.get('language-learn')).toBeTypeOf('function')
+})
+
+it('skips the widget when a listener claims the review', async () => {
+  claimReviews = true
+  faux.setResponses([
+    fauxAssistantMessage(
+      JSON.stringify({
+        mode: 'tutor',
+        sentence: 'Please fix the parser bug.',
+        words: [{ word: 'parser', note: 'note' }],
+        grammar: []
+      })
+    )
+  ])
+
+  await review('파서 버그를 고쳐 주세요, 입력이 비어 있으면 오류가 납니다.')
+
+  expect(reviews[0]).toMatchObject({ kind: 'tutor', sentence: 'Please fix the parser bug.' })
+  expect(widgets.has('language-learn')).toBe(true)
+  expect(widgets.get('language-learn')).toBeUndefined()
 })

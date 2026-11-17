@@ -32,6 +32,20 @@ CJK 文本按**字符数**计算（而不是按空格分词），所以用母语
 
 之后母语消息不再显示任何面板；学习语言上的写作检查照常工作。
 
+## 检查结果事件
+
+每次检查完成后，结果还会发到 pi 的共享事件总线上。其他扩展可以监听它，把结果显示在别处，比如编辑器侧边栏或日志文件：
+
+```ts
+pi.events.on('language-tutor:review', (review) => {
+  // { kind: 'check', prompt, items, rephrase?, handled }
+  // { kind: 'tutor', prompt, sentence, words, grammar, handled }
+  review.handled = true // 可选：不再在编辑器上方显示面板
+})
+```
+
+`handled` 要在处理函数里同步设置，不能放在任何 `await` 之后。没有监听者设置它时，面板照常显示。没有问题的检查和被跳过的消息不会发出事件。
+
 ## 记忆卡片
 
 Writing tutor 教过的单词会自动保存，并按单词去重。运行 `/flashcards` 可以打开复习窗口，浏览整个词库，或开始复习已经到期的卡片。
