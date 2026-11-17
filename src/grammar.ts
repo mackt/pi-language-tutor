@@ -7,12 +7,16 @@
  *
  * Non-blocking by design — the message reaches the agent immediately and a
  * failed review never disturbs the session.
+ *
+ * Each finished review is also emitted on `pi.events` as REVIEW_EVENT, so
+ * another extension can show it elsewhere (a sidebar, a log) and claim it to
+ * keep the widget away.
  */
 
 import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-agent'
 import { Container, Text } from '@earendil-works/pi-tui'
 import { loadConfig } from './config.ts'
-import type { Config, GrammarItem, ReviewResult } from './core.ts'
+import type { Config, GrammarItem, ReviewResult, TutorResult } from './core.ts'
 import { buildReviewPrompt, parseReviewResult, shouldSkipCheck } from './core.ts'
 import { addCards, loadCards, saveCards } from './flashcards.ts'
 import type { ForkContext } from './llm.ts'
@@ -20,6 +24,27 @@ import { resolveModel, runLlm } from './llm.ts'
 import { showTutorWidget } from './tutor.ts'
 
 const WIDGET_KEY = 'language-learn'
+
+/** `pi.events` channel that carries every finished review. */
+export const REVIEW_EVENT = 'language-tutor:review'
+
+type Review =
+  | { kind: 'check'; prompt: string; items: GrammarItem[]; rephrase?: string }
+  | ({ kind: 'tutor'; prompt: string } & TutorResult)
+
+/**
+ * Payload of REVIEW_EVENT. A listener that shows the review itself sets
+ * `handled = true` synchronously, and the widget is not shown.
+ */
+export type ReviewEvent = Review & { handled: boolean }
+
+/** Emit a review; true when a listener claimed it. */
+function emitReview(pi: ExtensionAPI, review: Review): boolean {
+  const event: ReviewEvent = { ...review, handled: false }
+  // A runtime without pi.events keeps the widget.
+  pi.events?.emit(REVIEW_EVENT, event)
+  return event.handled
+}
 
 export interface ReviewDeps {
   /** Fork of the main session's last LLM request (see createForkTracker). */
@@ -97,7 +122,11 @@ export function registerReview(
         // The prompt already withholds tutor mode when it is disabled; this
         // guard covers a model that returns it anyway.
         if (cfg.tutor) {
-          showTutorWidget(ctx, result.tutor)
+          if (emitReview(pi, { kind: 'tutor', prompt: text, ...result.tutor })) {
+            ctx.ui.setWidget(WIDGET_KEY, undefined)
+          } else {
+            showTutorWidget(ctx, result.tutor)
+          }
           // Auto-capture vocabulary as flashcards (deduped by word)
           if (result.tutor.words.length > 0) {
             const cards = loadCards()
@@ -113,7 +142,10 @@ export function registerReview(
       // check
       const items = result.items
       const rephrase = result.rephrase ?? undefined
-      if (items.length === 0 && !rephrase) {
+      if (
+        (items.length === 0 && !rephrase) ||
+        emitReview(pi, { kind: 'check', prompt: text, items, rephrase })
+      ) {
         ctx.ui.setWidget(WIDGET_KEY, undefined)
       } else {
         showCheckWidget(ctx, items, rephrase)

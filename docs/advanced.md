@@ -32,6 +32,20 @@ If you often write prompts in your native language on purpose and the tutor gets
 
 Native-language prompts then show no panel; the writing check keeps working for learning-language prompts.
 
+## Review events
+
+Every finished review is also emitted on pi's shared event bus, so another extension can show it somewhere else, such as an editor sidebar or a log file:
+
+```ts
+pi.events.on('language-tutor:review', (review) => {
+  // { kind: 'check', prompt, items, rephrase?, handled }
+  // { kind: 'tutor', prompt, sentence, words, grammar, handled }
+  review.handled = true // optional: skip the widget above the editor
+})
+```
+
+Set `handled` synchronously, before the handler awaits anything. When no listener sets it, the widget shows as usual. Empty checks and skipped prompts are not emitted.
+
 ## Flashcards
 
 Words taught by the Writing tutor are captured automatically and deduplicated by word. Run `/flashcards` to open the review window, browse the library, or start a round of due cards.
